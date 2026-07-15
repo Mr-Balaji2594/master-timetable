@@ -176,10 +176,17 @@ body {
     color: #fff;
     border: none;
     border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 20px;
+    padding: 10px 14px;
+    font-size: 22px;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.2s;
+    line-height: 1;
+    touch-action: manipulation;
+}
+
+.sidebar-toggle:active {
+    opacity: 0.7;
 }
 
 .sidebar-overlay {
@@ -191,6 +198,13 @@ body {
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
     z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
 }
 
 /* ── Main content ── */
@@ -792,12 +806,17 @@ code {
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .sidebar-toggle { display: block; }
-    .sidebar-overlay.show { display: block; }
     .sidebar {
         transform: translateX(-100%);
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
     }
     .sidebar.open {
         transform: translateX(0);
+    }
+    .sidebar-overlay.show {
+        display: block;
+        opacity: 1;
     }
     .main-content {
         margin-left: 0;
@@ -810,6 +829,9 @@ code {
         padding-top: 50px;
     }
     .navbar h4 { font-size: 18px; }
+    .navbar .user-badges {
+        flex-wrap: wrap;
+    }
     .table { font-size: 12px; }
     .table th, .table td { padding: 8px 10px; }
     .timetable-grid {
@@ -825,5 +847,560 @@ code {
     .period-num { width: 22px; height: 22px; font-size: 11px; border-width: 1.5px; }
     .slot-subject-name { display: none; }
     .timetable-legend { font-size: 10px; }
+    .stats-card { margin-bottom: 12px; }
     .stats-card h2 { font-size: 26px; }
+    .card-header-tabs {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    .card-header-tabs .btn {
+        width: 100%;
+    }
+    .btn-action-group {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .modal-dialog {
+        margin: 10px;
+    }
+    .modal-body {
+        padding: 16px;
+    }
+    .dataTables_wrapper .dt-top {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .dataTables_wrapper .dataTables_filter {
+        text-align: left;
+    }
+    .dt-search-input {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+    .dataTables_wrapper .dt-bottom {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+.badge.bg-purple { background: #8b5cf6 !important; color: #fff; }
+.badge.bg-dark { background: #1e293b !important; color: #fff; }
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.page-item .page-link {
+        padding: 4px 10px !important;
+        font-size: 12px !important;
+    }
+    .dt-buttons .btn {
+        font-size: 12px !important;
+        padding: 4px 10px !important;
+    }
+}
+
+/* ── Extra small devices ── */
+@media (max-width: 480px) {
+    .sidebar { width: 220px; }
+    .main-content { padding: 12px; }
+    .navbar { padding: 12px; padding-top: 50px; }
+    .navbar h4 { font-size: 16px; }
+    .card { padding: 16px; }
+    .modal-dialog { margin: 5px; }
+    .modal-body { padding: 12px; }
+}
+
+/* ── Accessibility: respect reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+    .card { animation: none; opacity: 1; transform: none; }
+    .sidebar { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   ENHANCED: DataTables, Modals, Animations
+   ═══════════════════════════════════════════════ */
+
+/* ── DataTables Overrides ── */
+.dataTables_wrapper {
+    padding-top: 0 !important;
+}
+
+.dataTables_wrapper .dt-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dataTables_wrapper .dataTables_filter {
+    text-align: right;
+}
+
+.dataTables_wrapper .dataTables_filter label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-weight: 500;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.dt-search-input {
+    padding: 8px 14px 8px 36px !important;
+    border-radius: 8px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    min-width: 220px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E") no-repeat 12px center !important;
+    transition: 0.2s !important;
+    font-size: 14px !important;
+}
+
+.dt-search-input:focus {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.12) !important;
+    outline: none !important;
+}
+
+.dataTables_wrapper .dataTables_length {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    padding: 6px 30px 6px 10px;
+    border-radius: 8px;
+    border: 1.5px solid #e2e8f0;
+    font-size: 14px;
+    background: #fff;
+    cursor: pointer;
+    min-width: 70px;
+}
+
+.dataTables_wrapper .dt-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dataTables_wrapper .dataTables_info {
+    font-size: 13px;
+    color: #94a3b8;
+    padding: 0;
+}
+
+/* ── DataTables Buttons ── */
+.dt-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.dt-buttons .btn {
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    background: #fff !important;
+    color: #475569 !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
+}
+
+.dt-buttons .btn:hover {
+    background: #f1f5f9 !important;
+    color: #667eea !important;
+    border-color: #cbd5e1 !important;
+}
+
+.dt-buttons .btn-primary {
+    background: #667eea !important;
+    color: #fff !important;
+    border-color: #667eea !important;
+}
+
+.dt-buttons .btn-primary:hover {
+    background: #5a6fd6 !important;
+    color: #fff !important;
+}
+
+.dt-buttons .dt-button-collection {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    border: 1px solid #e2e8f0;
+    padding: 6px;
+    min-width: 180px;
+}
+
+.dt-buttons .dt-button-collection .dt-button {
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #475569;
+    border: none;
+    background: none;
+    display: block;
+    width: 100%;
+    text-align: left;
+    transition: 0.15s;
+}
+
+.dt-buttons .dt-button-collection .dt-button:hover {
+    background: #f1f5f9;
+    color: #667eea;
+}
+
+/* ── Column visibility dropdown ── */
+div.dt-button-collection {
+    position: absolute;
+    z-index: 2001;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    border: 1px solid #e2e8f0;
+    padding: 6px;
+    min-width: 200px;
+}
+
+div.dt-button-collection .dt-button {
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #475569;
+    border: none;
+    background: none;
+    display: block;
+    width: 100%;
+    text-align: left;
+    transition: 0.15s;
+}
+
+div.dt-button-collection .dt-button:hover {
+    background: #f1f5f9;
+    color: #667eea;
+}
+
+div.dt-button-collection .dt-button.active {
+    background: #eef2ff;
+    color: #667eea;
+    font-weight: 600;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.page-item .page-link {
+    padding: 6px 14px !important;
+    border-radius: 8px !important;
+    margin: 0 2px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #fff !important;
+    color: #475569 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.page-item .page-link:hover {
+    background: #f1f5f9 !important;
+    color: #667eea !important;
+    border-color: #cbd5e1 !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.active .page-link {
+    background: #667eea !important;
+    color: #fff !important;
+    border-color: #667eea !important;
+    box-shadow: 0 2px 8px rgba(102,126,234,0.3) !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled .page-link {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+.dataTables_wrapper table.dataTable thead th {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 24px !important;
+}
+
+.dataTables_wrapper table.dataTable thead th.sorting:after,
+.dataTables_wrapper table.dataTable thead th.sorting_asc:after,
+.dataTables_wrapper table.dataTable thead th.sorting_desc:after {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'bootstrap-icons';
+    font-size: 12px;
+    opacity: 0.5;
+}
+
+.dataTables_wrapper table.dataTable thead th.sorting:after {
+    content: '\F282';
+    opacity: 0.3;
+}
+
+.dataTables_wrapper table.dataTable thead th.sorting_asc:after {
+    content: '\F282';
+    opacity: 0.3;
+}
+
+.dataTables_wrapper table.dataTable thead th.sorting_desc:after {
+    content: '\F286';
+    opacity: 0.3;
+}
+
+.dataTables_wrapper .dataTables_processing {
+    background: rgba(255,255,255,0.9) !important;
+    border: none !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    font-size: 14px !important;
+    color: #475569 !important;
+}
+
+.dt-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px;
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: #94a3b8;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* ── Modal Enhancements ── */
+.modal-content {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border-bottom: none;
+    padding: 18px 24px;
+}
+
+.modal-header .btn-close {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+}
+
+.modal-header .btn-close:hover {
+    opacity: 1;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-footer {
+    border-top: 1px solid #f1f5f9;
+    padding: 16px 24px;
+}
+
+.modal-title {
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.modal-backdrop.show {
+    opacity: 0.5;
+}
+
+.modal.fade .modal-dialog {
+    transform: scale(0.95) translateY(10px);
+    transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1) translateY(0);
+}
+
+/* ── Loading Overlay ── */
+.loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 12px;
+}
+
+.loading-overlay .spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+}
+
+/* ── Badge Enhancements ── */
+.badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.2px;
+}
+
+/* ── Action Buttons in Tables ── */
+.btn-action {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-action:hover {
+    transform: translateY(-1px);
+}
+
+.btn-action-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+}
+
+/* ── Card Entrance Animation ── */
+.card {
+    animation: cardFadeIn 0.4s ease forwards;
+}
+
+@keyframes cardFadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Form Enhancements ── */
+.form-control, .form-select {
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+}
+
+.was-validated .form-control:invalid,
+.form-control.is-invalid {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+
+.was-validated .form-control:valid,
+.form-control.is-valid {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ── Table Card Header ── */
+.card-header-tabs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+/* ── Responsive table wrapper for DataTables ── */
+.table-responsive-dt {
+    width: 100%;
+}
+
+/* ── Serial Number Column ── */
+td.dt-sno, th.dt-sno {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* ── DataTables Buttons ── */
+.dt-buttons .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* ── Tooltip style info ── */
+.text-truncate-max {
+    max-width: 200px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

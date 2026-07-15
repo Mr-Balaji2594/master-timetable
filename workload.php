@@ -1,9 +1,10 @@
 <?php
 $msg = '';
 $is_admin = isAdmin();
+$can_manage_all = isAdmin() || isPrincipal() || isVicePrincipal();
 $user_id = $_SESSION['user_id'];
 $my_dept = userDeptId();
-$can_manage = isAdmin() || isHOD();
+$can_manage = $can_manage_all || isHOD();
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['calculate_workload'])) {
@@ -43,7 +44,7 @@ $depts = $conn->query("SELECT * FROM departments ORDER BY name");
 ?>
 <div class="card">
     <h5>Calculate Workload</h5>
-    <form method="POST" class="row g-3">
+    <form method="POST" class="row g-3" hx-post="dashboard.php?page=workload" hx-target="#page-content-wrapper">
         <?= csrf_field() ?>
         <?php if ($can_manage): ?>
         <div class="col-md-4">
@@ -52,65 +53,67 @@ $depts = $conn->query("SELECT * FROM departments ORDER BY name");
                 <?php 
                 $emps = $conn->query("SELECT * FROM employees WHERE is_active=1 $emp_where_extra ORDER BY name");
                 while ($e = $emps->fetch_assoc()): ?>
-                    <option value="<?= $e['id'] ?>"><?= $e['name'] ?> (<?= $e['emp_id'] ?>)</option>
+                    <option value="<?= $e['id'] ?>"><?= e($e['name']) ?> (<?= e($e['emp_id']) ?>)</option>
                 <?php endwhile; ?>
             </select>
         </div>
         <div class="col-md-3">
-            <button type="submit" name="calculate_workload" class="btn btn-primary">Calculate</button>
+            <button type="submit" name="calculate_workload" value="1" class="btn btn-primary">Calculate</button>
         </div>
-        <?php if (isAdmin()): ?>
+        <?php if ($can_manage_all): ?>
         <div class="col-md-3">
-            <button type="submit" name="calculate_all" class="btn btn-warning">Calculate All</button>
+            <button type="submit" name="calculate_all" value="1" class="btn btn-warning">Calculate All</button>
         </div>
         <?php endif; ?>
         <?php else: ?>
         <div class="col-md-4">
-            <button type="submit" name="calculate_workload" class="btn btn-primary">View My Workload</button>
+            <button type="submit" name="calculate_workload" value="1" class="btn btn-primary">View My Workload</button>
         </div>
         <?php endif; ?>
     </form>
 </div>
 
 <?php if ($msg): ?>
-    <div class="alert alert-success"><?= $msg ?></div>
+    <div class="alert alert-success alert-auto"><?= e($msg) ?></div>
 <?php endif; ?>
 
 <div class="card">
     <h5>Staff Workload Summary</h5>
-    <p class="text-muted">Max workload: 36 periods/week (6 days × 6 periods)</p>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Emp ID</th>
-                <th>Name</th>
-                <th>Department</th>
-                <th>Designation</th>
-                <th>Total Classes</th>
-                <th>Periods/Week</th>
-                <th>Workload</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php while ($e = $employees->fetch_assoc()): 
-                $percentage = ($e['period_week'] / 36) * 100;
-                $color = $percentage > 100 ? 'danger' : ($percentage > 75 ? 'warning' : 'success');
-            ?>
-            <tr>
-                <td><?= $e['emp_id'] ?></td>
-                <td><?= $e['name'] ?></td>
-                <td><?= $e['dept_name'] ?></td>
-                <td><?= $e['designation'] ?></td>
-                <td><?= $e['total_hours'] ?: 0 ?></td>
-                <td><?= $e['period_week'] ?: 0 ?></td>
-                <td>
-                    <div class="workload-bar" style="width: 100px">
-                        <div class="workload-fill" style="width: <?= min($percentage, 100) ?>%; background: <?= $color === 'danger' ? '#e74c3c' : ($color === 'warning' ? '#f39c12' : '#27ae60') ?>"></div>
-                    </div>
-                    <small><?= round($percentage) ?>%</small>
-                </td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
+    <p class="text-muted">Max workload: 36 periods/week (6 days &times; 6 periods)</p>
+    <div class="table-responsive-dt">
+        <table class="table table-dt" id="workloadTable" data-sort="false">
+            <thead>
+                <tr>
+                    <th>Emp ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Total Classes</th>
+                    <th>Periods/Week</th>
+                    <th>Workload</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php while ($e = $employees->fetch_assoc()): 
+                    $percentage = ($e['period_week'] / 36) * 100;
+                    $color = $percentage > 100 ? 'danger' : ($percentage > 75 ? 'warning' : 'success');
+                ?>
+                <tr>
+                    <td><?= e($e['emp_id']) ?></td>
+                    <td><?= e($e['name']) ?></td>
+                    <td><?= e($e['dept_name']) ?></td>
+                    <td><?= e($e['designation']) ?></td>
+                    <td><?= $e['total_hours'] ?: 0 ?></td>
+                    <td><?= $e['period_week'] ?: 0 ?></td>
+                    <td>
+                        <div class="workload-bar" style="width: 100px">
+                            <div class="workload-fill" style="width: <?= min($percentage, 100) ?>%; background: <?= $color === 'danger' ? '#e74c3c' : ($color === 'warning' ? '#f39c12' : '#27ae60') ?>"></div>
+                        </div>
+                        <small><?= round($percentage) ?>%</small>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+            </tbody>
+        </table>
+    </div>
 </div>

@@ -2,13 +2,28 @@
 header('Content-Type: application/json');
 require '../config.php';
 
+if (!isLoggedIn()) {
+    http_response_code(401);
+    die(json_encode(['error' => 'Unauthorized']));
+}
+
+$my_dept = userDeptId();
+$my_user_id = $_SESSION['user_id'] ?? 0;
+$is_admin_or_management = isAdmin() || isPrincipal() || isVicePrincipal();
+$is_hod = isHOD();
+
 $emp_id = $_GET['emp_id'] ?? '';
 $day = $_GET['day'] ?? 0;
 $class_id = $_GET['class_id'] ?? 0;
 $format = $_GET['format'] ?? 'json';
 
 $where = [];
-if ($emp_id) $where[] = "e.emp_id = '$emp_id'";
+if ($is_hod) {
+    $where[] = "e.department_id = $my_dept";
+} elseif (!$is_admin_or_management) {
+    $where[] = "t.employee_id = $my_user_id";
+}
+if ($emp_id) $where[] = "e.emp_id = '" . $conn->real_escape_string($emp_id) . "'";
 if ($day) $where[] = "t.day_of_week = " . intval($day);
 if ($class_id) $where[] = "t.class_id = " . intval($class_id);
 $where_sql = $where ? "WHERE " . implode(" AND ", $where) : "";

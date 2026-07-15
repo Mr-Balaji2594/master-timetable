@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['role'] = $row['role'];
                 $_SESSION['dept_id'] = $row['dept_id'];
                 $_SESSION['dept_name'] = $row['dept_name'];
-                $_SESSION['is_admin'] = ($row['role'] === 'admin');
+                $_SESSION['is_admin'] = ($row['role'] === 'admin' || $row['role'] === 'super_admin');
                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 record_login_attempt($emp_id, true);
                 audit_log('login', "User {$row['emp_id']} logged in");

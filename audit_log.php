@@ -14,7 +14,7 @@ $actions = $conn->query("SELECT DISTINCT action FROM audit_logs ORDER BY action"
 ?>
 <div class="card mb-3">
     <h5><i class="bi bi-clock-history me-2" style="color:#667eea"></i>Audit Log</h5>
-    <form method="GET" class="row g-3">
+    <form method="GET" class="row g-3" hx-get="dashboard.php" hx-target="#page-content-wrapper" hx-push-url="true">
         <input type="hidden" name="page" value="audit_log">
         <div class="col-md-4">
             <select name="action" class="form-select">
@@ -31,8 +31,8 @@ $actions = $conn->query("SELECT DISTINCT action FROM audit_logs ORDER BY action"
 </div>
 
 <div class="card">
-    <div class="table-responsive">
-        <table class="table">
+    <div class="table-responsive-dt">
+        <table class="table table-dt" id="auditLogTable" data-sort="false">
             <thead>
                 <tr>
                     <th>Time</th>
