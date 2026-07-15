@@ -94,7 +94,8 @@ CREATE TABLE IF NOT EXISTS lesson_plans (
     semester VARCHAR(10),
     topic VARCHAR(255) NOT NULL,
     description TEXT,
-    objectives TEXT,
+    unit VARCHAR(100),
+    plan_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
@@ -106,10 +107,15 @@ CREATE TABLE IF NOT EXISTS leave_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
     employee_id INT NOT NULL,
     leave_date DATE NOT NULL,
+    due_date DATE DEFAULT NULL,
     nature VARCHAR(50) DEFAULT 'casual',
     days INT DEFAULT 1,
     reason TEXT,
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    status ENUM('pending_hod', 'pending_principal', 'approved', 'rejected') DEFAULT 'pending_hod',
+    hod_approved_by INT DEFAULT NULL,
+    hod_approved_at TIMESTAMP NULL DEFAULT NULL,
+    principal_approved_by INT DEFAULT NULL,
+    principal_approved_at TIMESTAMP NULL DEFAULT NULL,
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
 );
@@ -124,7 +130,7 @@ CREATE TABLE IF NOT EXISTS substitution_duties (
     day_of_week TINYINT NOT NULL,
     period_no TINYINT NOT NULL,
     leave_date DATE NOT NULL,
-    status ENUM('pending', 'accepted', 'completed', 'cancelled') DEFAULT 'pending',
+    status ENUM('assigned', 'completed', 'cancelled') DEFAULT 'assigned',
     compensation_hours DECIMAL(3,1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (original_employee_id) REFERENCES employees(id) ON DELETE CASCADE,
@@ -237,3 +243,9 @@ ON DUPLICATE KEY UPDATE name = name;
 
 -- Migration: add combined_group_id for existing tables (safe to re-run)
 ALTER TABLE timetable ADD COLUMN IF NOT EXISTS combined_group_id INT NULL COMMENT 'links two slots for combined classes' AFTER room_no;
+
+-- Migration: add is_common flag for subjects (e.g., Tamil, English language papers)
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_common TINYINT DEFAULT 0 COMMENT '1=common paper across departments' AFTER lecture_hours_per_week;
+
+-- Insert Languages department for common papers
+INSERT IGNORE INTO departments (name, code) VALUES ('Languages', 'LAN');

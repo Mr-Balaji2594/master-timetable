@@ -1,24 +1,24 @@
 <?php
-if (isHOD()) requireAdminOrHOD();
+requireAdminOrHOD();
 $msg = '';
-$edit_id = isset($_REQUEST['edit']) ? (int)$_REQUEST['edit'] : 0;
-$my_dept = isHOD() ? userDeptId() : 0;
+$dept_scoped = isHOD() && !isPrincipal() && !isVicePrincipal();
+$my_dept = $dept_scoped ? userDeptId() : 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add'])) {
         $name = sanitize($_POST['name']);
         $dept_id = intval($_POST['department_id']);
-        $batch_year = intval($_POST['batch_year']);
+        $batch_year = sanitize($_POST['batch_year']);
         $year = sanitize($_POST['year']);
-        $conn->query("INSERT INTO classes (name, department_id, batch_year, year) VALUES ('$name', $dept_id, $batch_year, '$year')");
+        $conn->query("INSERT INTO classes (name, department_id, batch_year, year) VALUES ('$name', $dept_id, '$batch_year', '$year')");
         $msg = 'Class added successfully';
     } elseif (isset($_POST['update'])) {
         $class_id = (int)$_POST['class_id'];
         $name = sanitize($_POST['name']);
         $dept_id = intval($_POST['department_id']);
-        $batch_year = intval($_POST['batch_year']);
+        $batch_year = sanitize($_POST['batch_year']);
         $year = sanitize($_POST['year']);
-        $conn->query("UPDATE classes SET name='$name', department_id=$dept_id, batch_year=$batch_year, year='$year' WHERE id=$class_id");
+        $conn->query("UPDATE classes SET name='$name', department_id=$dept_id, batch_year='$batch_year', year='$year' WHERE id=$class_id");
         $msg = 'Class updated successfully';
     } elseif (isset($_POST['delete'])) {
         $conn->query("DELETE FROM classes WHERE id=" . intval($_POST['delete']));
@@ -26,127 +26,178 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-$class_where = isHOD() ? "WHERE c.department_id = $my_dept" : "";
+$class_where = $dept_scoped ? "WHERE c.department_id = $my_dept" : "";
 $classes = $conn->query("SELECT c.*, d.name as dept_name FROM classes c JOIN departments d ON c.department_id = d.id $class_where ORDER BY d.name, c.batch_year");
-$dept_where = isHOD() ? "WHERE id = $my_dept" : "";
+$dept_where = $dept_scoped ? "WHERE id = $my_dept" : "";
 $depts = $conn->query("SELECT * FROM departments $dept_where ORDER BY name");
-
-$edit_class = null;
-if ($edit_id > 0) {
-    $edit_result = $conn->query("SELECT * FROM classes WHERE id=$edit_id");
-    $edit_class = $edit_result->fetch_assoc();
-}
 ?>
 <?php if ($msg): ?>
-<div class="alert alert-success"><?php echo $msg; ?></div>
+<div class="alert alert-success alert-auto"><?= e($msg) ?></div>
 <?php endif; ?>
 
-<?php if ($edit_class): ?>
-<div class="card" style="border: 2px solid #3498db;">
-    <h5>Edit Class</h5>
-    <form method="POST" action="dashboard.php?page=classes" class="row g-3">
-        <?= csrf_field() ?>
-        <input type="hidden" name="class_id" value="<?php echo $edit_class['id']; ?>">
-        <div class="col-md-3">
-            <input type="text" name="name" class="form-control" value="<?php echo $edit_class['name']; ?>" required>
-        </div>
-        <div class="col-md-3">
-            <select name="department_id" class="form-select" required>
-                <option value="">Dept</option>
-                <?php 
-                $dept_list = $conn->query("SELECT * FROM departments ORDER BY name");
-                while ($d = $dept_list->fetch_assoc()): ?>
-                    <option value="<?php echo $d['id']; ?>" <?php echo ($edit_class['department_id']==$d['id'])?'selected':''; ?>><?php echo $d['name']; ?></option>
+<div class="card">
+    <div class="card-header-tabs">
+        <h5><i class="bi bi-mortarboard me-2" style="color:#667eea"></i>Classes</h5>
+        <?php if (isAdmin()): ?>
+        <button type="button" class="btn btn-success" data-modal="addClassModal" data-title="Add New Class">
+            <i class="bi bi-plus-lg"></i> Add Class
+        </button>
+        <?php endif; ?>
+    </div>
+    <div class="table-responsive-dt">
+        <table class="table table-dt" id="classesTable">
+            <thead>
+                <tr>
+                    <th>Room No</th>
+                    <th>Department</th>
+                    <th>Batch Year</th>
+                    <th>Year</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php while ($c = $classes->fetch_assoc()): ?>
+                <tr>
+                    <td><strong><?= e($c['name']) ?></strong></td>
+                    <td><?= e($c['dept_name']) ?></td>
+                    <td><?= $c['batch_year'] ?></td>
+                    <td><span class="badge bg-info"><?= e($c['year']) ?></span></td>
+                    <td>
+                        <?php if (isAdmin()): ?>
+                        <div class="btn-action-group">
+                            <button type="button" class="btn btn-primary btn-action" data-modal="editClassModal"
+                                data-title="Edit - <?= e($c['name']) ?>" data-class_id="<?= $c['id'] ?>"
+                                data-name="<?= e($c['name']) ?>" data-department_id="<?= $c['department_id'] ?>"
+                                data-batch_year="<?= $c['batch_year'] ?>" data-year="<?= e($c['year']) ?>">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button type="button" class="btn btn-danger btn-action"
+                                hx-post="dashboard.php?page=classes"
+                                hx-vals='<?= json_encode(['delete' => $c['id'], csrf_token_name() => csrf_token()]) ?>'
+                                hx-target="#page-content-wrapper"
+                                hx-confirm="Delete class &quot;<?= e($c['name']) ?>&quot;?">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                        <?php else: ?>
+                        <span class="text-muted">View only</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
                 <?php endwhile; ?>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="batch_year" class="form-control" value="<?php echo $edit_class['batch_year']; ?>" required>
-        </div>
-        <div class="col-md-2">
-            <select name="year" class="form-select" required>
-                <option value="I" <?php echo ($edit_class['year']=='I')?'selected':''; ?>>I Year</option>
-                <option value="II" <?php echo ($edit_class['year']=='II')?'selected':''; ?>>II Year</option>
-                <option value="III" <?php echo ($edit_class['year']=='III')?'selected':''; ?>>III Year</option>
-                <option value="IV" <?php echo ($edit_class['year']=='IV')?'selected':''; ?>>IV Year</option>
-                <option value="V" <?php echo ($edit_class['year']=='V')?'selected':''; ?>>V Year</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" name="update" class="btn btn-primary">Update</button>
-        </div>
-    </form>
-    <div class="mt-2">
-        <a href="dashboard.php?page=classes" class="btn btn-secondary btn-sm">Cancel</a>
+            </tbody>
+        </table>
     </div>
 </div>
-<?php endif; ?>
 
-<div class="card">
-    <h5>Add New Class</h5>
-    <form method="POST" action="dashboard.php?page=classes" class="row g-3">
-        <?= csrf_field() ?>
-        <div class="col-md-3">
-            <input type="text" name="name" class="form-control" placeholder="Class Name (e.g. CS-I-A)" required>
+<!-- Add Class Modal -->
+<div class="modal fade" id="addClassModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Class</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" class="modal-form needs-validation" novalidate
+                  hx-post="dashboard.php?page=classes" hx-target="#page-content-wrapper"
+                  hx-on::after-request="if(event.detail.successful){window.closeModal('addClassModal')}">
+                <?= csrf_field() ?>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Room No</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g. CS-I-A">
+                        <div class="invalid-feedback">Please enter class name.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Department</label>
+                        <select name="department_id" class="form-select" required>
+                            <option value="">Select Department</option>
+                            <?php $depts->data_seek(0);
+                            while ($d = $depts->fetch_assoc()): ?>
+                            <option value="<?= $d['id'] ?>"><?= e($d['name']) ?></option>
+                            <?php endwhile; ?>
+                        </select>
+                        <div class="invalid-feedback">Please select a department.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Batch Year</label>
+                        <input type="text" name="batch_year" class="form-control" required placeholder="e.g. 2024-2027">
+                        <div class="invalid-feedback">Please enter batch year.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <select name="year" class="form-select" required>
+                            <option value="">Select Year</option>
+                            <option value="I">I Year</option>
+                            <option value="II">II Year</option>
+                            <option value="III">III Year</option>
+                        </select>
+                        <div class="invalid-feedback">Please select a year.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="add" value="1" class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Add
+                        Class</button>
+                </div>
+            </form>
         </div>
-        <div class="col-md-3">
-            <select name="department_id" class="form-select" required>
-                <option value="">Department</option>
-                <?php while ($d = $depts->fetch_assoc()): ?>
-                    <option value="<?php echo $d['id']; ?>"><?php echo $d['name']; ?></option>
-                <?php endwhile; ?>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="batch_year" class="form-control" placeholder="Year" value="<?php echo date('Y'); ?>" required>
-        </div>
-        <div class="col-md-2">
-            <select name="year" class="form-select" required>
-                <option value="">Select Year</option>
-                <option value="I">I Year</option>
-                <option value="II">II Year</option>
-                <option value="III">III Year</option>
-                <option value="IV">IV Year</option>
-                <option value="V">V Year</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" name="add" class="btn btn-success">Add</button>
-        </div>
-    </form>
+    </div>
 </div>
 
-<div class="card">
-    <h5>All Classes</h5>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Class Name</th>
-                <th>Department</th>
-                <th>Batch Year</th>
-                <th>Year</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php while ($c = $classes->fetch_assoc()): ?>
-            <tr>
-                <td><?php echo $c['id']; ?></td>
-                <td><?php echo $c['name']; ?></td>
-                <td><?php echo $c['dept_name']; ?></td>
-                <td><?php echo $c['batch_year']; ?></td>
-                <td><?php echo $c['year']; ?></td>
-                <td>
-                    <a href="dashboard.php?page=classes&edit=<?php echo $c['id']; ?>" class="btn btn-primary btn-sm">Edit</a>
-                    <form method="POST" action="dashboard.php?page=classes" style="display:inline">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="delete" value="<?php echo $c['id']; ?>">
-                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
+<!-- Edit Class Modal -->
+<?php $edit_depts = $conn->query("SELECT * FROM departments ORDER BY name"); ?>
+<div class="modal fade" id="editClassModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Class</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" class="modal-form needs-validation" novalidate
+                  hx-post="dashboard.php?page=classes" hx-target="#page-content-wrapper"
+                  hx-on::after-request="if(event.detail.successful){window.closeModal('editClassModal')}">
+                <?= csrf_field() ?>
+                <input type="hidden" name="class_id" data-fill="class_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Room No</label>
+                        <input type="text" name="name" class="form-control" data-fill="name" required>
+                        <div class="invalid-feedback">Please enter room no.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Department</label>
+                        <select name="department_id" class="form-select" data-fill="department_id" required>
+                            <option value="">Select Department</option>
+                            <?php while ($d = $edit_depts->fetch_assoc()): ?>
+                            <option value="<?= $d['id'] ?>"><?= e($d['name']) ?></option>
+                            <?php endwhile; ?>
+                        </select>
+                        <div class="invalid-feedback">Please select a department.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Batch Year</label>
+                        <input type="text" name="batch_year" class="form-control" data-fill="batch_year" required
+                            placeholder="e.g. 2024-2027">
+                        <div class="invalid-feedback">Please enter batch year.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <select name="year" class="form-select" data-fill="year" required>
+                            <option value="">Select Year</option>
+                            <option value="I">I Year</option>
+                            <option value="II">II Year</option>
+                            <option value="III">III Year</option>
+                        </select>
+                        <div class="invalid-feedback">Please select a year.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="update" value="1" class="btn btn-primary"><i
+                            class="bi bi-save me-1"></i>Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>

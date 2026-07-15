@@ -8,7 +8,7 @@ ini_set('display_errors', 0);
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', 'root');
-define('DB_NAME', 'college_timetable');
+define('DB_NAME', 'atasctkm_timetable');
 define('SESSION_TIMEOUT', 1800);
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOGIN_LOCKOUT_MINUTES', 15);
@@ -43,11 +43,18 @@ function hasRole($role) {
     return isset($_SESSION['role']) && $_SESSION['role'] === $role;
 }
 
-function isAdmin() { return hasRole('admin'); }
+function isSuperAdmin() { return hasRole('super_admin'); }
+function isAdmin() { return hasRole('admin') || isSuperAdmin(); }
+function isPrincipal() { return hasRole('principal'); }
+function isVicePrincipal() { return hasRole('vice_principal'); }
 function isHOD() { return hasRole('hod'); }
 
 function isAdminOrHOD() {
-    return isAdmin() || isHOD();
+    return isAdmin() || isPrincipal() || isVicePrincipal() || isHOD();
+}
+
+function isManagement() {
+    return isAdmin() || isPrincipal() || isVicePrincipal() || isHOD();
 }
 
 function userDeptId() { return $_SESSION['dept_id'] ?? 0; }
@@ -60,7 +67,20 @@ function requireRole($role) {
     }
 }
 
-function requireAdmin() { requireRole('admin'); }
+function requireAdmin() {
+    if (!isAdmin()) {
+        if (!isLoggedIn()) redirect('index.php');
+        http_response_code(403);
+        die("Access denied.");
+    }
+}
+function requireSuperAdmin() {
+    if (!isSuperAdmin()) {
+        if (!isLoggedIn()) redirect('index.php');
+        http_response_code(403);
+        die("Access denied.");
+    }
+}
 function requireAdminOrHOD() {
     if (!isAdminOrHOD()) {
         if (!isLoggedIn()) redirect('index.php');
@@ -98,6 +118,10 @@ function csrf_token() {
 
 function csrf_field() {
     return '<input type="hidden" name="csrf_token" value="' . csrf_token() . '">';
+}
+
+function csrf_token_name() {
+    return 'csrf_token';
 }
 
 function verify_csrf() {

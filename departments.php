@@ -1,16 +1,17 @@
 <?php
-if (isHOD()) requireAdminOrHOD();
+requireAdminOrHOD();
 $msg = '';
-$edit_id = isset($_REQUEST['edit']) ? (int)$_REQUEST['edit'] : 0;
-$my_dept = isHOD() ? userDeptId() : 0;
+$dept_scoped = isHOD() && !isPrincipal() && !isVicePrincipal();
+$my_dept = $dept_scoped ? userDeptId() : 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add'])) {
         $name = sanitize($_POST['name']);
         $code = sanitize($_POST['code']);
-        $conn->query("INSERT INTO departments (name, code) VALUES ('$name', '$code')");
+        $branch_code = sanitize($_POST['branch_code']);
+        $hod_id = intval($_POST['hod_id'] ?? 0);
+        $conn->query("INSERT INTO departments (name, code, branch_code, hod_id) VALUES ('$name', '$code', '$branch_code', $hod_id)");
         $dept_id = $conn->insert_id;
-        
         $staff_count = isset($_POST['staff_count']) ? (int)$_POST['staff_count'] : 0;
         for ($i = 1; $i <= $staff_count; $i++) {
             $s_name = isset($_POST['staff_name_' . $i]) ? sanitize($_POST['staff_name_' . $i]) : '';
@@ -29,7 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $dept_id = (int)$_POST['dept_id'];
         $name = sanitize($_POST['name']);
         $code = sanitize($_POST['code']);
-        $conn->query("UPDATE departments SET name='$name', code='$code' WHERE id=$dept_id");
+        $branch_code = sanitize($_POST['branch_code']);
+        $hod_id = intval($_POST['hod_id'] ?? 0);
+        $conn->query("UPDATE departments SET name='$name', code='$code', branch_code='$branch_code', hod_id=$hod_id WHERE id=$dept_id");
         $msg = 'Department updated';
     } elseif (isset($_POST['delete'])) {
         $conn->query("DELETE FROM departments WHERE id=" . intval($_POST['delete']));
@@ -42,117 +45,175 @@ while ($ud = $update_depts->fetch_assoc()) {
     $conn->query("UPDATE departments SET staff_count=" . (int)$ud['cnt'] . " WHERE id=" . $ud['department_id']);
 }
 
-$dept_where = isHOD() ? "WHERE id=$my_dept" : "";
-$depts = $conn->query("SELECT * FROM departments $dept_where ORDER BY name");
-$edit_dept = null;
-if ($edit_id > 0) {
-    if (isHOD() && $edit_id != $my_dept) redirect('dashboard.php?page=departments');
-    $edit_result = $conn->query("SELECT * FROM departments WHERE id=$edit_id");
-    $edit_dept = $edit_result->fetch_assoc();
-}
+$dept_where = $dept_scoped ? "WHERE d.id=$my_dept" : "";
+$depts = $conn->query("SELECT d.*, e.name as hod_name FROM departments d LEFT JOIN employees e ON d.hod_id = e.id $dept_where ORDER BY d.name");
+$hods = $conn->query("SELECT id, emp_id, name FROM employees WHERE is_active=1 AND role='hod' ORDER BY name");
 ?>
-<script>
-function showStaffFields() {
-    var count = document.getElementById('staff_count').value;
-    var container = document.getElementById('staff_list');
-    var wrapper = document.getElementById('staff_fields');
-    if (count > 0) {
-        wrapper.style.display = 'block';
-        var html = '';
-        for (var i = 1; i <= count; i++) {
-            html += '<div class="row g-3 mb-2">' +
-                '<div class="col-md-1"><strong>Staff ' + i + '</strong></div>' +
-                '<div class="col-md-4"><input type="text" name="staff_name_' + i + '" class="form-control" placeholder="Name"></div>' +
-                '<div class="col-md-3"><input type="text" name="staff_desig_' + i + '" class="form-control" placeholder="Designation"></div>' +
-            '</div>';
-        }
-        container.innerHTML = html;
-    } else {
-        wrapper.style.display = 'none';
-    }
-}
-</script>
 <?php if ($msg): ?>
-<div class="alert alert-success"><?php echo $msg; ?></div>
+<div class="alert alert-success alert-auto"><?= $msg ?></div>
 <?php endif; ?>
-
-<?php if ($edit_dept): ?>
-<div class="card" style="border: 2px solid #3498db;">
-    <h5>Edit Department</h5>
-    <form method="POST" action="dashboard.php?page=departments" class="row g-3">
-        <?= csrf_field() ?>
-        <input type="hidden" name="dept_id" value="<?php echo $edit_dept['id']; ?>">
-        <div class="col-md-4">
-            <input type="text" name="name" class="form-control" value="<?php echo $edit_dept['name']; ?>" required>
-        </div>
-        <div class="col-md-3">
-            <input type="text" name="code" class="form-control" value="<?php echo $edit_dept['code']; ?>" required>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" name="update" class="btn btn-primary">Update</button>
-        </div>
-        <div class="col-md-2">
-            <a href="dashboard.php?page=departments" class="btn btn-secondary">Cancel</a>
-        </div>
-    </form>
-</div>
-<?php endif; ?>
-
-<?php if (isAdmin()): ?>
-<div class="card">
-    <h5>Add New Department</h5>
-    <form method="POST" class="row g-3">
-        <?= csrf_field() ?>
-        <div class="col-md-3">
-            <input type="text" name="name" class="form-control" placeholder="Department Name" required>
-        </div>
-        <div class="col-md-2">
-            <input type="text" name="code" class="form-control" placeholder="Code (e.g. CS)" required>
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="staff_count" id="staff_count" class="form-control" placeholder="Staff Count" min="0" value="0" onchange="showStaffFields()">
-        </div>
-        <div class="col-md-2">
-            <button type="submit" name="add" class="btn btn-success">Add</button>
-        </div>
-    </form>
-</div>
-<?php endif; ?>
-
-<div id="staff_fields" class="card" style="display:none;">
-    <h5>Add Staff Members</h5>
-    <div id="staff_list"></div>
-</div>
 
 <div class="card">
-    <h5>All Departments</h5>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Code</th>
-                <th>Staff Count</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php while ($d = $depts->fetch_assoc()): ?>
-            <tr>
-                <td><?php echo $d['id']; ?></td>
-                <td><?php echo $d['name']; ?></td>
-                <td><?php echo $d['code']; ?></td>
-                <td><?php echo (int)$conn->query("SELECT COUNT(*) as c FROM employees WHERE department_id=".$d['id'])->fetch_assoc()['c']; ?></td>
-                <td>
-                    <a href="dashboard.php?page=departments&edit=<?php echo $d['id']; ?>" class="btn btn-primary btn-sm">Edit</a>
-                    <form method="POST" action="dashboard.php?page=departments" style="display:inline">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="delete" value="<?php echo $d['id']; ?>">
-                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
+    <div class="card-header-tabs">
+        <h5><i class="bi bi-building me-2" style="color:#667eea"></i>Departments</h5>
+        <?php if (isAdmin()): ?>
+        <button type="button" class="btn btn-success" data-modal="addDeptModal" data-title="Add New Department">
+            <i class="bi bi-plus-lg"></i> Add Department
+        </button>
+        <?php endif; ?>
+    </div>
+    <div class="table-responsive-dt">
+        <table class="table table-dt" id="deptsTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Branch Code</th>
+                    <th>HOD</th>
+                    <th>Staff</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php while ($d = $depts->fetch_assoc()): ?>
+                <tr>
+                    <td><strong><?= e($d['name']) ?></strong></td>
+                    <td><code><?= e($d['code']) ?></code></td>
+                    <td><code><?= e($d['branch_code'] ?? '') ?></code></td>
+                    <td><?= e($d['hod_name'] ?? '-') ?></td>
+                    <td><span
+                            class="badge bg-info"><?= (int)$conn->query("SELECT COUNT(*) as c FROM employees WHERE department_id=" . $d['id'])->fetch_assoc()['c'] ?></span>
+                    </td>
+                    <td>
+                        <div class="btn-action-group">
+                            <?php if (isAdmin()): ?>
+                            <button type="button" class="btn btn-primary btn-action" data-modal="editDeptModal"
+                                data-title="Edit Department - <?= e($d['name']) ?>" data-dept_id="<?= $d['id'] ?>"
+                                data-name="<?= e($d['name']) ?>" data-code="<?= e($d['code']) ?>"
+                                data-branch_code="<?= e($d['branch_code'] ?? '') ?>"
+                                data-hod_id="<?= (int)($d['hod_id'] ?? 0) ?>">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button type="button" class="btn btn-danger btn-action"
+                                hx-post="dashboard.php?page=departments"
+                                hx-vals='<?= json_encode(['delete' => $d['id'], csrf_token_name() => csrf_token()]) ?>'
+                                hx-target="#page-content-wrapper"
+                                hx-confirm="Delete department &quot;<?= e($d['name']) ?>&quot;?">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                            <?php else: ?>
+                            <span class="text-muted">View only</span>
+                            <?php endif; ?>
+                        </div>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Department Modal -->
+<div class="modal fade" id="addDeptModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Department</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" class="modal-form needs-validation" novalidate
+                  hx-post="dashboard.php?page=departments" hx-target="#page-content-wrapper"
+                  hx-on::after-request="if(event.detail.successful){window.closeModal('addDeptModal')}">
+                <?= csrf_field() ?>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Department Name</label>
+                        <input type="text" name="name" class="form-control" required
+                            placeholder="e.g. Computer Science">
+                        <div class="invalid-feedback">Please enter department name.</div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Code</label>
+                            <input type="text" name="code" class="form-control" required placeholder="e.g. CS">
+                            <div class="invalid-feedback">Please enter code.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Branch Code</label>
+                            <input type="text" name="branch_code" class="form-control" placeholder="e.g. 17">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Head of Department (HOD)</label>
+                        <select name="hod_id" class="form-select" placeholder="Select HOD">
+                            <option value="">Select HOD</option>
+                            <?php
+                            $hods->data_seek(0);
+                            while ($e = $hods->fetch_assoc()): ?>
+                            <option value="<?= $e['id'] ?>"><?= e($e['name']) ?> (<?= e($e['emp_id']) ?>)</option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="add" value="1" class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Add
+                        Department</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Department Modal -->
+<div class="modal fade" id="editDeptModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Department</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" class="modal-form needs-validation" novalidate
+                  hx-post="dashboard.php?page=departments" hx-target="#page-content-wrapper"
+                  hx-on::after-request="if(event.detail.successful){window.closeModal('editDeptModal')}">
+                <?= csrf_field() ?>
+                <input type="hidden" name="dept_id" data-fill="dept_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Department Name</label>
+                        <input type="text" name="name" class="form-control" data-fill="name" required>
+                        <div class="invalid-feedback">Please enter department name.</div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Code</label>
+                            <input type="text" name="code" class="form-control" data-fill="code" required>
+                            <div class="invalid-feedback">Please enter code.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Branch Code</label>
+                            <input type="text" name="branch_code" class="form-control" data-fill="branch_code"
+                                placeholder="e.g. 17">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Head of Department (HOD)</label>
+                        <select name="hod_id" class="form-select" data-fill="hod_id" placeholder="Select HOD">
+                            <option value="">Select HOD</option>
+                            <?php
+                            $all_hods = $conn->query("SELECT id, emp_id, name FROM employees WHERE is_active=1 AND role='hod' ORDER BY name");
+                            while ($e = $all_hods->fetch_assoc()): ?>
+                            <option value="<?= $e['id'] ?>"><?= e($e['name']) ?> (<?= e($e['emp_id']) ?>)</option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="update" value="1" class="btn btn-primary"><i
+                            class="bi bi-save me-1"></i>Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>

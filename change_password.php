@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php if ($error): ?>
                 <div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i><?= e($error) ?></div>
             <?php endif; ?>
-            <form method="POST">
+            <form method="POST" hx-post="dashboard.php?page=change_password" hx-target="#page-content-wrapper">
                 <?= csrf_field() ?>
                 <div class="mb-3">
                     <label class="form-label">Current Password</label>
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <input type="password" name="confirm_password" class="form-control" required placeholder="Re-enter new password" autocomplete="new-password">
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">
+                <button type="submit" name="change_password" value="1" class="btn btn-primary w-100">
                     <i class="bi bi-check-lg me-2"></i>Update Password
                 </button>
             </form>

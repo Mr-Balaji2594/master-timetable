@@ -123,10 +123,11 @@ function render_timetable_grid($result, $show_delete = false) {
                                 <span class="combined-badge">+<?= htmlspecialchars($slot['combined_class_name']) ?></span>
                             <?php endif; ?>
                             <?php if ($show_delete): ?>
-                                <form method="POST" style="display:inline">
-                                    <?= csrf_field() ?>
-                                    <button type="submit" name="delete_slot" value="<?= $slot['id'] ?>" class="btn btn-danger btn-sm mt-1" onclick="return confirm('Delete slot?')">X</button>
-                                </form>
+                                <button type="button" class="btn btn-danger btn-sm mt-1"
+                                    hx-post="dashboard.php?page=timetable"
+                                    hx-vals='<?= json_encode(['delete_slot' => $slot['id'], csrf_token_name() => csrf_token()]) ?>'
+                                    hx-target="#page-content-wrapper"
+                                    hx-confirm="Delete slot?">X</button>
                             <?php endif; ?>
                         </div>
                         <?php endforeach; ?>
@@ -155,17 +156,17 @@ function render_timetable_grid($result, $show_delete = false) {
 
 <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
-        <a class="nav-link <?= $view=='staff'?'active':'' ?>" href="dashboard.php?page=timetable&view=staff">Staff Timetable</a>
+        <a class="nav-link <?= $view=='staff'?'active':'' ?>" hx-get="dashboard.php?page=timetable&view=staff" hx-target="#page-content-wrapper" hx-push-url="true">Staff Timetable</a>
     </li>
     <?php if (isAdminOrHOD()): ?>
     <li class="nav-item">
-        <a class="nav-link <?= $view=='dept'?'active':'' ?>" href="dashboard.php?page=timetable&view=dept">Department Timetable</a>
+        <a class="nav-link <?= $view=='dept'?'active':'' ?>" hx-get="dashboard.php?page=timetable&view=dept" hx-target="#page-content-wrapper" hx-push-url="true">Department Timetable</a>
     </li>
     <?php endif; ?>
 </ul>
 
 <?php if ($msg): ?>
-    <div class="alert alert-success"><?= $msg ?></div>
+    <div class="alert alert-success alert-auto"><?= e($msg) ?></div>
 <?php endif; ?>
 <?php if ($view == 'staff'): ?>
 
@@ -179,14 +180,14 @@ $my_dept_for_staff = $my_dept;
 
 <div class="card mb-3">
     <h5>Staff Timetable</h5>
-    <form method="GET" class="row g-3">
+    <form method="GET" class="row g-3" hx-get="dashboard.php" hx-target="#page-content-wrapper" hx-push-url="true">
         <input type="hidden" name="page" value="timetable">
         <input type="hidden" name="view" value="staff">
         <div class="col-md-3">
             <select name="employee_id" class="form-select" onchange="this.form.submit()">
                 <option value="">Select Staff</option>
                 <?php
-$emp_where = !isAdmin() ? "AND department_id = $my_dept AND role='staff'" : "";
+$emp_where = !isAdmin() && !isPrincipal() && !isVicePrincipal() ? "AND department_id = $my_dept AND role='staff'" : "";
 $emps = $conn->query("SELECT * FROM employees WHERE is_active=1 $emp_where ORDER BY name");
                 while ($e = $emps->fetch_assoc()): ?>
                     <option value="<?= $e['id'] ?>" <?= $selected_employee==$e['id']?'selected':'' ?>><?= $e['name'] ?> (<?= $e['emp_id'] ?>)<?= $e['id']==$_SESSION['user_id']?' (Me)':'' ?></option>
@@ -206,82 +207,6 @@ $emps = $conn->query("SELECT * FROM employees WHERE is_active=1 $emp_where ORDER
 <?php if ($selected_employee > 0):
     $emp_name_row = $conn->query("SELECT name FROM employees WHERE id=$selected_employee")->fetch_assoc();
     $emp_name = $emp_name_row['name'] ?? 'Staff';
-
-    if ($my_profile || isAdminOrHOD()): ?>
-    <div class="card mb-3">
-        <h5>Add Timetable Slot</h5>
-        <form method="POST" class="row g-3">
-            <?= csrf_field() ?>
-            <input type="hidden" name="employee_id" value="<?= $selected_employee ?>">
-            <div class="col-md-2">
-                <select name="semester" class="form-select" required>
-                    <option value="">Sem</option>
-                    <option value="odd">Odd</option>
-                    <option value="even">Even</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select name="class_id" class="form-select" required>
-                    <option value="">Class</option>
-                    <?php
-                    $my_classes = $conn->query("SELECT * FROM classes WHERE department_id = $my_dept_for_staff ORDER BY name");
-                    while ($mc = $my_classes->fetch_assoc()): ?>
-                        <option value="<?= $mc['id'] ?>"><?= htmlspecialchars($mc['name']) ?></option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select name="subject_id" class="form-select" required>
-                    <option value="">Subject</option>
-                    <?php
-                    $my_subs = $conn->query("SELECT * FROM subjects WHERE department_id = $my_dept_for_staff ORDER BY name");
-                    while ($ms = $my_subs->fetch_assoc()): ?>
-                        <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['code']) ?> - <?= htmlspecialchars($ms['name']) ?></option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <div class="col-md-1">
-                <select name="day_of_week" class="form-select" required>
-                    <option value="">Day</option>
-                    <?php for ($i = 1; $i <= 6; $i++): ?>
-                        <option value="<?= $i ?>"><?= ['I','II','III','IV','V','VI'][$i-1] ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="col-md-1">
-                <select name="period_no" class="form-select" required>
-                    <option value="">Per</option>
-                    <?php for ($i = 1; $i <= 6; $i++): ?>
-                        <option value="<?= $i ?>"><?= $i ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <input type="text" name="room_no" class="form-control" placeholder="Room">
-            </div>
-            <div class="col-12">
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" id="combinedToggleStaff" onchange="toggleCombinedStaff()">
-                    <label class="form-check-label" for="combinedToggleStaff">Combined class (teach 2 classes together)</label>
-                </div>
-            </div>
-            <div class="col-md-3" id="combinedClassGroupStaff" style="display:none">
-                <select name="combined_class_id" class="form-select">
-                    <option value="">Select second class</option>
-                    <?php
-                    $all_classes = $conn->query("SELECT c.*, d.name as dept_name FROM classes c JOIN departments d ON c.department_id = d.id ORDER BY d.name, c.name");
-                    while ($ac = $all_classes->fetch_assoc()): ?>
-                        <option value="<?= $ac['id'] ?>"><?= htmlspecialchars($ac['name']) ?> (<?= htmlspecialchars($ac['dept_name']) ?>)</option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <button type="submit" name="add_slot" class="btn btn-success">Add Slot</button>
-            </div>
-        </form>
-    </div>
-    <?php endif; ?>
-    <?php
     $sem_filter = $selected_semester ? " AND t.semester='$selected_semester'" : "";
     $result = $conn->query("SELECT t.*, s.name as subject_name, s.code as subject_code, 
                                    e.name as emp_name, e.emp_id, c.name as class_name,
@@ -298,7 +223,14 @@ $emps = $conn->query("SELECT * FROM employees WHERE is_active=1 $emp_where ORDER
     <div class="card mb-3" id="print-area">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h5 class="mb-0">Weekly Timetable - <?= htmlspecialchars($emp_name) ?></h5>
-            <a href="export_pdf.php?type=timetable_staff&employee_id=<?= $selected_employee ?>&semester=<?= $selected_semester ?>" class="btn btn-info btn-sm" target="_blank"><i class="bi bi-filetype-pdf"></i> PDF</a>
+            <div class="d-flex gap-2">
+                <?php if ($my_profile || isAdminOrHOD()): ?>
+                <button type="button" class="btn btn-success btn-sm" data-modal="addSlotModal" data-title="Add Timetable Slot" data-employee_id="<?= $selected_employee ?>">
+                    <i class="bi bi-plus-lg"></i> Add Slot
+                </button>
+                <?php endif; ?>
+                <a href="export_pdf.php?type=timetable_staff&employee_id=<?= $selected_employee ?>&semester=<?= $selected_semester ?>" class="btn btn-info btn-sm" target="_blank"><i class="bi bi-filetype-pdf"></i> PDF</a>
+            </div>
         </div>
         <?php render_timetable_grid($result, true); ?>
     </div>
@@ -328,7 +260,7 @@ $emps = $conn->query("SELECT * FROM employees WHERE is_active=1 $emp_where ORDER
 
 <div class="card mb-3">
     <h5>Department Timetable</h5>
-    <form method="GET" class="row g-3">
+    <form method="GET" class="row g-3" hx-get="dashboard.php" hx-target="#page-content-wrapper" hx-push-url="true">
         <input type="hidden" name="page" value="timetable">
         <input type="hidden" name="view" value="dept">
         <?php if (!isHOD()): ?>
@@ -395,6 +327,106 @@ $dept_id = $selected_dept ?: $my_dept;
 <?php endif; ?>
 
 <?php endif; ?>
+
+<!-- Add Slot Modal -->
+<div class="modal fade" id="addSlotModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Timetable Slot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" class="modal-form needs-validation" novalidate
+                  hx-post="dashboard.php?page=timetable" hx-target="#page-content-wrapper"
+                  hx-on::after-request="if(event.detail.successful){window.closeModal('addSlotModal')}">
+                <?= csrf_field() ?>
+                <input type="hidden" name="employee_id" data-fill="employee_id">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Semester</label>
+                            <select name="semester" class="form-select" required>
+                                <option value="">Select</option>
+                                <option value="odd">Odd</option>
+                                <option value="even">Even</option>
+                            </select>
+                            <div class="invalid-feedback">Select semester.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Class</label>
+                            <select name="class_id" class="form-select" required>
+                                <option value="">Select Class</option>
+                                <?php
+                                $my_classes = $conn->query("SELECT * FROM classes WHERE department_id = $my_dept_for_staff ORDER BY name");
+                                while ($mc = $my_classes->fetch_assoc()): ?>
+                                    <option value="<?= $mc['id'] ?>"><?= htmlspecialchars($mc['name']) ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                            <div class="invalid-feedback">Select a class.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Subject</label>
+                            <select name="subject_id" class="form-select" required>
+                                <option value="">Select Subject</option>
+                                <?php
+                                $my_subs = $conn->query("SELECT * FROM subjects WHERE department_id = $my_dept_for_staff ORDER BY name");
+                                while ($ms = $my_subs->fetch_assoc()): ?>
+                                    <option value="<?= $ms['id'] ?>"><?= htmlspecialchars($ms['code']) ?> - <?= htmlspecialchars($ms['name']) ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                            <div class="invalid-feedback">Select a subject.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Day</label>
+                            <select name="day_of_week" class="form-select" required>
+                                <option value="">Select Day</option>
+                                <?php for ($i = 1; $i <= 6; $i++): ?>
+                                    <option value="<?= $i ?>"><?= ['I','II','III','IV','V','VI'][$i-1] ?></option>
+                                <?php endfor; ?>
+                            </select>
+                            <div class="invalid-feedback">Select a day.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Period</label>
+                            <select name="period_no" class="form-select" required>
+                                <option value="">Select Period</option>
+                                <?php for ($i = 1; $i <= 6; $i++): ?>
+                                    <option value="<?= $i ?>"><?= $i ?></option>
+                                <?php endfor; ?>
+                            </select>
+                            <div class="invalid-feedback">Select a period.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Room No</label>
+                            <input type="text" name="room_no" class="form-control" placeholder="e.g. 101">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="combinedToggleStaff" onchange="document.getElementById('combinedClassGroupStaff').style.display = this.checked ? 'block' : 'none'">
+                                <label class="form-check-label" for="combinedToggleStaff">Combined Class</label>
+                            </div>
+                        </div>
+                        <div class="col-12" id="combinedClassGroupStaff" style="display:none">
+                            <label class="form-label">Combined With</label>
+                            <select name="combined_class_id" class="form-select">
+                                <option value="">Select second class</option>
+                                <?php
+                                $all_classes = $conn->query("SELECT c.*, d.name as dept_name FROM classes c JOIN departments d ON c.department_id = d.id ORDER BY d.name, c.name");
+                                while ($ac = $all_classes->fetch_assoc()): ?>
+                                    <option value="<?= $ac['id'] ?>"><?= htmlspecialchars($ac['name']) ?> (<?= htmlspecialchars($ac['dept_name']) ?>)</option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="add_slot" value="1" class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Add Slot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script>
 function toggleCombinedStaff() {
