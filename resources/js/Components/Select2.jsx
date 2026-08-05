@@ -38,7 +38,10 @@ function toOptions(options) {
 
 export default function Select2({ options, value, onChange, placeholder = 'Select...', isClearable = true, isSearchable = true, required, name, className, isDisabled }) {
     const opts = toOptions(options)
-    const selected = opts.find(o => String(o.value) === String(value)) || null
+    function flatOpts(arr) {
+        return arr.reduce((acc, o) => o.options ? acc.concat(o.options) : acc.concat(o), [])
+    }
+    const selected = flatOpts(opts).find(o => String(o.value) === String(value)) || null
 
     return (
         <Select

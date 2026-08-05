@@ -51,19 +51,28 @@ class TimetableController extends Controller
                 'label' => "{$c->name} - {$c->department?->name} - {$c->year}",
             ]);
 
+        $allClasses = SchoolClass::with('department')
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id', 'year'])
+            ->map(fn($c) => [
+                'id' => $c->id,
+                'label' => "{$c->name} - {$c->department?->name} - {$c->year}",
+            ]);
+
         $employees = Employee::where('is_active', true)
             ->when($isHodScoped, fn($q) => $q->where('department_id', $user->department_id))
             ->orderBy('name')
             ->get(['id', 'emp_id', 'name', 'department_id']);
 
-        $subjects = Subject::when($isHodScoped, $deptScope)
+        $subjects = Subject::with('department:id,name,code')
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'department_id', 'is_common']);
 
         return Inertia::render('Timetable/Index', [
             'slots' => $slots,
             'employees' => $employees,
             'classes' => $classes,
+            'allClasses' => $allClasses,
             'subjects' => $subjects,
             'filters' => request()->only(['employee_id', 'class_id', 'day_of_week']),
         ]);
@@ -71,6 +80,11 @@ class TimetableController extends Controller
 
     public function store()
     {
+        $user = Auth::user();
+        if ($user->isStaff()) {
+            return redirect()->back()->with('error', 'Unauthorized');
+        }
+
         $data = request()->validate([
             'class_id' => 'required|integer|exists:classes,id',
             'subject_id' => 'required|integer|exists:subjects,id',

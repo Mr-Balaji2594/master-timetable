@@ -21,7 +21,7 @@ class StaffSubjectController extends Controller
     {
         $user = Auth::user();
 
-        $assignments = EmployeeSubject::with(['employee', 'subject'])
+        $assignments = EmployeeSubject::with(['employee.department', 'subject'])
             ->when(!$user->isAdmin() && !$user->isPrincipal() && !$user->isVicePrincipal(), fn($q) => $q->whereHas('employee', fn($q) => $q->where('department_id', $user->department_id)))
             ->orderBy('employee_id')
             ->get()
@@ -29,7 +29,7 @@ class StaffSubjectController extends Controller
                 'id' => $a->id,
                 'employee_id' => $a->employee_id,
                 'subject_id' => $a->subject_id,
-                'employee' => $a->employee ? ['id' => $a->employee->id, 'emp_id' => $a->employee->emp_id, 'name' => $a->employee->name] : null,
+                'employee' => $a->employee ? ['id' => $a->employee->id, 'emp_id' => $a->employee->emp_id, 'name' => $a->employee->name, 'department' => $a->employee->department?->name] : null,
                 'subject' => $a->subject ? ['id' => $a->subject->id, 'name' => $a->subject->name, 'code' => $a->subject->code] : null,
             ]);
 

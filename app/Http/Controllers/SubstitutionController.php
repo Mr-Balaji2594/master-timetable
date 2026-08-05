@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Compensation;
+use App\Models\Employee;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\SubstitutionDuty;
@@ -36,11 +38,23 @@ class SubstitutionController extends Controller
                 'subject' => $s->subject ? ['id' => $s->subject->id, 'name' => $s->subject->name] : null,
             ]);
 
-        $classes = SchoolClass::orderBy('name')->get(['id', 'name']);
+        $classes = SchoolClass::with('department')->orderBy('name')->get(['id', 'name', 'department_id', 'year']);
         $subjects = Subject::orderBy('name')->get(['id', 'name']);
+        $employees = Employee::where('is_active', true)
+            ->whereIn('role', ['hod', 'staff'])
+            ->when($user->isHOD(), fn($q) => $q->where('department_id', $user->department_id))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $allEmployees = Employee::where('is_active', true)
+            ->whereIn('role', ['hod', 'staff'])
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return Inertia::render('Substitution/Index', [
             'substitutions' => $substitutions,
+            'employees' => $employees,
+            'allEmployees' => $allEmployees,
             'classes' => $classes,
             'subjects' => $subjects,
         ]);
@@ -78,6 +92,44 @@ class SubstitutionController extends Controller
         audit_log('substitution_update', "Updated substitution #{$substitution->id} status to {$data['status']}");
 
         return redirect()->back()->with('success', 'Substitution duty updated successfully');
+    }
+
+    public function complete(SubstitutionDuty $substitution)
+    {
+        if ($substitution->status !== 'pending') {
+            return redirect()->back()->with('error', 'Substitution is already ' . $substitution->status);
+        }
+
+        $substitution->update(['status' => 'completed']);
+
+        if ($substitution->compensation_hours > 0) {
+            Compensation::create([
+                'original_employee_id' => $substitution->original_employee_id,
+                'substitute_employee_id' => $substitution->substitute_employee_id,
+                'class_id' => $substitution->class_id,
+                'subject_id' => $substitution->subject_id,
+                'day_of_week' => $substitution->day_of_week,
+                'period_no' => $substitution->period_no,
+                'leave_date' => $substitution->leave_date,
+                'status' => 'pending',
+            ]);
+        }
+
+        audit_log('substitution_complete', "Completed substitution #{$substitution->id}");
+
+        return redirect()->back()->with('success', 'Substitution marked as completed');
+    }
+
+    public function cancel(SubstitutionDuty $substitution)
+    {
+        if (in_array($substitution->status, ['completed', 'cancelled'])) {
+            return redirect()->back()->with('error', 'Substitution is already ' . $substitution->status);
+        }
+
+        $substitution->update(['status' => 'cancelled']);
+        audit_log('substitution_cancel', "Cancelled substitution #{$substitution->id}");
+
+        return redirect()->back()->with('success', 'Substitution cancelled');
     }
 
     public function destroy(SubstitutionDuty $substitution)

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Compensation extends Model
 {
+    protected $table = 'compensation';
     public $timestamps = false;
 
     protected $fillable = [

@@ -96,7 +96,7 @@ export default function Index({ assignments, employees, subjects, departments })
                     </Col></Row>}
                     <DataTable data={filtered} columns={[
                         { header: 'Employee', accessorKey: 'employee.name' },
-                        { header: 'Department', accessorKey: 'employee.emp_id' },
+                        { header: 'Department', accessorKey: 'employee.department', cell: ({ getValue }) => getValue() || '-' },
                         { header: 'Subject', accessorKey: 'subject.name', cell: ({ row }) => `${row.original.subject?.name} (${row.original.subject?.code})` },
                         { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => (
                             canAssign ? (

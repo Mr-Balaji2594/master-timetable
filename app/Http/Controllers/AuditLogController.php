@@ -21,8 +21,8 @@ class AuditLogController extends Controller
             ->when(request('from_date'), fn($q, $v) => $q->whereDate('created_at', '>=', $v))
             ->when(request('to_date'), fn($q, $v) => $q->whereDate('created_at', '<=', $v))
             ->orderByDesc('id')
-            ->paginate(50)
-            ->through(fn($log) => [
+            ->get()
+            ->map(fn($log) => [
                 'id' => $log->id,
                 'user_id' => $log->user_id,
                 'emp_id' => $log->emp_id,

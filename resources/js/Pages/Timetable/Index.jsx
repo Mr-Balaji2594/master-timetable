@@ -1,6 +1,6 @@
 import { Head, usePage, router } from '@inertiajs/react'
 import { Card, Table, Button, Modal, Form, Row, Col } from 'react-bootstrap'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -24,13 +24,39 @@ const schema = z.object({
     period_no: z.string().min(1, 'Period is required'),
 })
 
-export default function Index({ slots, employees, classes, subjects }) {
+export default function Index({ slots, employees, classes, allClasses, subjects }) {
+    const subjectOptions = useMemo(() => {
+        if (!subjects) return []
+        const common = []
+        const byDept = {}
+        subjects.forEach(s => {
+            const opt = { value: s.id, label: `${s.name} (${s.code})` }
+            if (s.is_common) {
+                common.push(opt)
+            } else {
+                const deptName = s.department?.name || 'Unknown'
+                if (!byDept[deptName]) byDept[deptName] = []
+                byDept[deptName].push(opt)
+            }
+        })
+        const groups = []
+        if (common.length) groups.push({ label: 'Common Papers', options: common })
+        Object.keys(byDept).sort().forEach(dept => {
+            groups.push({ label: dept, options: byDept[dept] })
+        })
+        return groups
+    }, [subjects])
     const { auth, flash } = usePage().props
     const user = auth?.user
+    const isStaff = user?.role === 'staff'
     const canManage = ['admin', 'super_admin', 'principal', 'hod'].includes(user?.role)
     const [show, setShow] = useState(false)
     const [edit, setEdit] = useState(null)
-    const [filters, setFilters] = useState({ employee_id: employees?.length > 0 ? String(employees[0].id) : '', class_id: '', day_of_week: '' })
+    const [filters, setFilters] = useState({
+        employee_id: isStaff ? String(user?.id) : (employees?.length > 0 ? String(employees[0].id) : ''),
+        class_id: '',
+        day_of_week: ''
+    })
 
     const defaults = { employee_id: '', class_id: '', subject_id: '', day_of_week: '', period_no: '' }
     const { control, handleSubmit, reset, setError, formState: { errors } } = useForm({
@@ -100,18 +126,22 @@ export default function Index({ slots, employees, classes, subjects }) {
                         </Button>
                     </div>
                     <Row className="mb-3 g-2 no-print">
-                        <Col md={3}>
-                            <Select2 value={filters.employee_id} onChange={v => setFilters(f => ({ ...f, employee_id: v }))}
-                                options={employees?.map(e => ({ value: e.id, label: e.name }))} placeholder="All Employees" />
-                        </Col>
-                        <Col md={3}>
-                            <Select2 value={filters.class_id} onChange={v => setFilters(f => ({ ...f, class_id: v }))}
-                                options={classes?.map(c => ({ value: c.id, label: c.label }))} placeholder="All Classes" />
-                        </Col>
-                        <Col md={3}>
-                            <Select2 value={filters.day_of_week} onChange={v => setFilters(f => ({ ...f, day_of_week: v }))}
-                                options={dayNames.map((d, i) => ({ value: String(i + 1), label: d }))} placeholder="All Days" />
-                        </Col>
+                        {!isStaff && (
+                            <>
+                            <Col md={3}>
+                                <Select2 value={filters.employee_id} onChange={v => setFilters(f => ({ ...f, employee_id: v }))}
+                                    options={employees?.map(e => ({ value: e.id, label: e.name }))} placeholder="All Employees" />
+                            </Col>
+                            <Col md={3}>
+                                <Select2 value={filters.class_id} onChange={v => setFilters(f => ({ ...f, class_id: v }))}
+                                    options={classes?.map(c => ({ value: c.id, label: c.label }))} placeholder="All Classes" />
+                            </Col>
+                            <Col md={3}>
+                                <Select2 value={filters.day_of_week} onChange={v => setFilters(f => ({ ...f, day_of_week: v }))}
+                                    options={dayNames.map((d, i) => ({ value: String(i + 1), label: d }))} placeholder="All Days" />
+                            </Col>
+                            </>
+                        )}
                     </Row>
                     <div className="table-responsive print-area">
                         <style>{`
@@ -214,9 +244,9 @@ export default function Index({ slots, employees, classes, subjects }) {
                         <Select2Field name="employee_id" label="Employee" control={control} errors={errors}
                             options={employees?.map(e => ({ value: e.id, label: e.name }))} isClearable={false} />
                         <Select2Field name="subject_id" label="Subject" control={control} errors={errors}
-                            options={subjects?.map(s => ({ value: s.id, label: `${s.name} (${s.code})` }))} isClearable={false} />
+                            options={subjectOptions} isClearable={false} />
                         <Select2Field name="class_id" label="Class" control={control} errors={errors}
-                            options={classes?.map(c => ({ value: c.id, label: c.label }))} isClearable={false} />
+                            options={allClasses?.map(c => ({ value: c.id, label: c.label }))} isClearable={false} />
                     </Modal.Body>
                     <Modal.Footer>
                         <Button variant="secondary" onClick={() => setShow(false)}>Cancel</Button>

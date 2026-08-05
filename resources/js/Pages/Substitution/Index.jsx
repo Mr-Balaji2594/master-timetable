@@ -1,6 +1,6 @@
 import { Head, usePage, router } from '@inertiajs/react'
 import { Card, Button, Modal, Form, Row, Col, Badge } from 'react-bootstrap'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,10 +9,9 @@ import FormField from '../../Components/FormField'
 import DataTable from '../../Components/DataTable'
 import FormErrors from '../../Components/FormErrors'
 import FlashAlert from '../../Components/FlashAlert'
-import { showConfirm } from '../../Helpers/sweetAlert'
 import AuthenticatedLayout from '../../Layouts/Authenticated'
 
-const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const dayNames = ['I', 'II', 'III', 'IV', 'V', 'VI']
 
 const schema = z.object({
     original_employee_id: z.string().min(1, 'Original staff is required'),
@@ -24,15 +23,28 @@ const schema = z.object({
     leave_date: z.string().min(1, 'Date is required')
 })
 
-export default function Index({ substitutions, employees, classes, subjects }) {
+const compSchema = z.object({
+    original_employee_id: z.string().min(1, 'Required'),
+    substitute_employee_id: z.string().min(1, 'Required'),
+    class_id: z.string().min(1, 'Required'),
+    subject_id: z.string().min(1, 'Required'),
+    day_of_week: z.string().min(1, 'Required'),
+    period_no: z.string().min(1, 'Required'),
+    leave_date: z.string().min(1, 'Required'),
+})
+
+export default function Index({ substitutions, employees, allEmployees, classes, subjects }) {
     const { auth, flash } = usePage().props
     const user = auth?.user
-    const canDelete = ['admin', 'super_admin', 'principal', 'hod'].includes(user?.role)
+    const isStaff = user?.role === 'staff'
     const [show, setShow] = useState(false)
-    const defaults = { original_employee_id: '', substitute_employee_id: '', class_id: '', subject_id: '', day_of_week: '', period_no: '', leave_date: '' }
+    const [showComp, setShowComp] = useState(false)
+    const [compSub, setCompSub] = useState(null)
+    const defaults = { original_employee_id: isStaff ? String(user.id) : '', substitute_employee_id: '', class_id: '', subject_id: '', day_of_week: '', period_no: '', leave_date: '' }
     const { control, handleSubmit, reset, setError, formState: { errors } } = useForm({
         resolver: zodResolver(schema), defaultValues: defaults
     })
+    const compForm = useForm({ resolver: zodResolver(compSchema) })
 
     const openAssign = () => { reset(defaults); setShow(true) }
     const submit = handleSubmit((formData) => {
@@ -40,15 +52,32 @@ export default function Index({ substitutions, employees, classes, subjects }) {
         const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
         router.post('/substitution', formData, { onSuccess: done, onError })
     })
-    const handleDelete = async (sub) => {
-        const result = await showConfirm('Remove Substitution?', 'Remove this substitution?')
-        if (result.isConfirmed) router.delete(`/substitution/${sub.id}`)
+    const openCompensation = (sub) => {
+        setCompSub(sub)
+        const raw = sub.leave_date || ''
+        const leaveDate = raw.length >= 10 ? raw.substring(0, 10) : raw
+        compForm.reset({
+            original_employee_id: String(sub.substitute_employee?.id),
+            substitute_employee_id: String(sub.original_employee?.id),
+            class_id: String(sub.class_id),
+            subject_id: String(sub.subject_id),
+            day_of_week: String(sub.day_of_week),
+            period_no: String(sub.period_no),
+            leave_date: leaveDate,
+        })
+        setShowComp(true)
     }
+    const submitComp = compForm.handleSubmit((formData) => {
+        const done = () => { setShowComp(false); setCompSub(null); compForm.reset() }
+        const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => compForm.setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
+        router.post('/compensations', formData, { onSuccess: done, onError })
+    })
 
     return (
         <AuthenticatedLayout>
             <Head title="Substitution - Master Timetable" />
             <FlashAlert message={flash?.success} />
+            <FlashAlert message={flash?.error} variant="danger" />
 
             <Card>
                 <Card.Body>
@@ -65,29 +94,45 @@ export default function Index({ substitutions, employees, classes, subjects }) {
                         { header: 'Date', accessorKey: 'leave_date' },
                         { header: 'Status', accessorKey: 'status', cell: ({ getValue }) => {
                             const color = getValue() === 'completed' ? 'success' : getValue() === 'cancelled' ? 'danger' : 'warning'
-                            return <Badge bg={color}>{getValue()}</Badge>
+                            return <Badge bg={color}>{getValue().charAt(0).toUpperCase() + getValue().slice(1)}</Badge>
                         }},
-                        { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => (
-                            canDelete && <Button size="sm" variant="outline-danger" onClick={() => handleDelete(row.original)}><i className="bi bi-trash"></i></Button>
-                        )},
+                        { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => {
+                            const s = row.original
+                            return (
+                                s.status === 'pending' && (
+                                    <Button size="sm" variant="outline-info" onClick={() => openCompensation(s)}>
+                                        <i className="bi bi-arrow-left-right me-1"></i>Compensation
+                                    </Button>
+                                )
+                            )
+                        }},
                     ]} searchable />
                 </Card.Body>
             </Card>
 
-            <Modal show={show} onHide={() => setShow(false)}>
+            <Modal show={show} onHide={() => setShow(false)} size="lg">
                 <Modal.Header closeButton><Modal.Title>Assign Substitution</Modal.Title></Modal.Header>
                 <Form onSubmit={submit}>
                     <Modal.Body>
                         <FormErrors />
                         <Row>
-                            <Col md={6}><Select2Field name="original_employee_id" label="Original Staff" control={control} errors={errors}
-                                options={employees?.map(e => ({ value: e.id, label: e.name }))} isClearable={false} /></Col>
+                            <Col md={6}>
+                                {isStaff ? (
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Original Staff</Form.Label>
+                                        <Form.Control type="text" value={user?.name} disabled />
+                                    </Form.Group>
+                                ) : (
+                                    <Select2Field name="original_employee_id" label="Original Staff" control={control} errors={errors}
+                                        options={employees?.map(e => ({ value: e.id, label: e.name }))} isClearable={false} />
+                                )}
+                            </Col>
                             <Col md={6}><Select2Field name="substitute_employee_id" label="Substitute" control={control} errors={errors}
-                                options={employees?.map(e => ({ value: e.id, label: e.name }))} isClearable={false} /></Col>
+                                options={allEmployees?.filter(e => !isStaff || e.id !== user.id).map(e => ({ value: e.id, label: e.name }))} isClearable={false} /></Col>
                         </Row>
                         <Row>
                             <Col md={6}><Select2Field name="class_id" label="Class" control={control} errors={errors}
-                                options={classes?.map(c => ({ value: c.id, label: c.name }))} isClearable={false} /></Col>
+                                options={classes?.map(c => ({ value: c.id, label: `${c.name} - ${c.department?.name} - ${c.year}` }))} isClearable={false} /></Col>
                             <Col md={6}><Select2Field name="subject_id" label="Subject" control={control} errors={errors}
                                 options={subjects?.map(s => ({ value: s.id, label: s.name }))} isClearable={false} /></Col>
                         </Row>
@@ -102,6 +147,61 @@ export default function Index({ substitutions, employees, classes, subjects }) {
                     <Modal.Footer>
                         <Button variant="secondary" onClick={() => setShow(false)}>Cancel</Button>
                         <Button type="submit" variant="primary">Save</Button>
+                    </Modal.Footer>
+                </Form>
+            </Modal>
+
+            <Modal show={showComp} onHide={() => setShowComp(false)} size="lg">
+                <Modal.Header closeButton><Modal.Title>Create Compensation</Modal.Title></Modal.Header>
+                <Form onSubmit={submitComp}>
+                    <Modal.Body>
+                        <FormErrors errors={compForm.formState.errors} />
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Original Staff</Form.Label>
+                                    <Form.Control type="text" value={compSub?.substitute_employee?.name || ''} disabled />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Substitute</Form.Label>
+                                    <Form.Control type="text" value={compSub?.original_employee?.name || ''} disabled />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Class</Form.Label>
+                                    <Form.Control type="text" value={compSub?.class?.name || ''} disabled />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Select2Field name="subject_id" label="Subject" control={compForm.control} errors={compForm.formState.errors}
+                                    options={subjects?.map(s => ({ value: s.id, label: s.name }))} isClearable={false} />
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={4}>
+                                <Select2Field name="day_of_week" label="Day" control={compForm.control} errors={compForm.formState.errors}
+                                    options={dayNames.map((d, i) => ({ value: String(i + 1), label: d }))} isClearable={false} />
+                            </Col>
+                            <Col md={4}>
+                                <Select2Field name="period_no" label="Period" control={compForm.control} errors={compForm.formState.errors}
+                                    options={[1, 2, 3, 4, 5, 6].map(p => ({ value: String(p), label: String(p) }))} isClearable={false} />
+                            </Col>
+                            <Col md={4}>
+                                <FormField name="leave_date" label="Date" type="date" control={compForm.control} errors={compForm.formState.errors} />
+                            </Col>
+                        </Row>
+                        <input type="hidden" {...compForm.register('original_employee_id')} />
+                        <input type="hidden" {...compForm.register('substitute_employee_id')} />
+                        <input type="hidden" {...compForm.register('class_id')} />
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setShowComp(false)}>Cancel</Button>
+                        <Button type="submit" variant="primary">Create Compensation</Button>
                     </Modal.Footer>
                 </Form>
             </Modal>

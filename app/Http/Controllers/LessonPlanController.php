@@ -15,7 +15,7 @@ class LessonPlanController extends Controller
     {
         $user = Auth::user();
 
-        $plans = LessonPlan::with(['employee', 'class', 'subject', 'hodApprover', 'principalApprover'])
+        $plans = LessonPlan::with(['employee', 'class.department', 'subject.department', 'hodApprover', 'principalApprover'])
             ->when($user->isStaff(), fn($q) => $q->where('employee_id', $user->id))
             ->when($user->isHOD(), fn($q) => $q->whereHas('employee', fn($q) => $q->where('department_id', $user->department_id)))
             ->orderByDesc('plan_date')
@@ -38,14 +38,14 @@ class LessonPlanController extends Controller
                 'principal_approved_by' => $p->principal_approved_by,
                 'principal_approved_at' => $p->principal_approved_at?->format('d/m/Y H:i:s'),
                 'employee' => $p->employee ? ['id' => $p->employee->id, 'emp_id' => $p->employee->emp_id, 'name' => $p->employee->name] : null,
-                'class' => $p->class ? ['id' => $p->class->id, 'name' => $p->class->name] : null,
+                'class' => $p->class ? ['id' => $p->class->id, 'name' => $p->class->name, 'department' => $p->class->department ? ['name' => $p->class->department->name] : null, 'year' => $p->class->year] : null,
                 'subject' => $p->subject ? ['id' => $p->subject->id, 'name' => $p->subject->name, 'code' => $p->subject->code] : null,
                 'hod_approver' => $p->hodApprover ? ['id' => $p->hodApprover->id, 'name' => $p->hodApprover->name] : null,
                 'principal_approver' => $p->principalApprover ? ['id' => $p->principalApprover->id, 'name' => $p->principalApprover->name] : null,
             ]);
 
-        $classes = SchoolClass::orderBy('name')->get(['id', 'name']);
-        $subjects = Subject::orderBy('name')->get(['id', 'name', 'code']);
+        $classes = SchoolClass::with('department')->orderBy('name')->get(['id', 'name', 'department_id', 'year']);
+        $subjects = Subject::with('department')->orderBy('name')->get(['id', 'name', 'code', 'department_id']);
         $employees = Employee::where('is_active', true)->orderBy('name')->get(['id', 'emp_id', 'name']);
 
         return Inertia::render('LessonPlan/Index', [
@@ -73,7 +73,7 @@ class LessonPlanController extends Controller
         ]);
 
         $data['employee_id'] = $user->id;
-        $data['status'] = 'pending_hod';
+        $data['status'] = $user->isHOD() ? 'pending_principal' : 'pending_hod';
 
         LessonPlan::create($data);
         audit_log('lesson_plan_create', "Created lesson plan: {$data['topic']}");
@@ -84,12 +84,21 @@ class LessonPlanController extends Controller
     public function approveHod(LessonPlan $lessonPlan)
     {
         $user = Auth::user();
-        if (!$user->isHOD() && !$user->isPrincipal() && !$user->isAdmin()) {
+
+        if (!$user->isHOD()) {
             return redirect()->back()->with('error', 'Unauthorized');
         }
 
         if ($lessonPlan->status !== 'pending_hod') {
             return redirect()->back()->with('error', 'Lesson plan is already ' . $lessonPlan->status);
+        }
+
+        if ($lessonPlan->employee_id === $user->id) {
+            return redirect()->back()->with('error', 'You cannot approve your own lesson plan');
+        }
+
+        if ($lessonPlan->employee->department_id !== $user->department_id) {
+            return redirect()->back()->with('error', 'You can only approve plans from your department');
         }
 
         $lessonPlan->update([
@@ -125,10 +134,48 @@ class LessonPlanController extends Controller
         return redirect()->back()->with('success', 'Lesson plan approved by Principal');
     }
 
+    public function update(LessonPlan $lessonPlan)
+    {
+        $user = Auth::user();
+
+        if ($lessonPlan->employee_id !== $user->id && !$user->isAdmin() && !$user->isPrincipal()) {
+            return redirect()->back()->with('error', 'You can only edit your own lesson plans');
+        }
+
+        if (in_array($lessonPlan->status, ['approved', 'rejected'])) {
+            return redirect()->back()->with('error', 'Cannot edit a lesson plan that is already ' . $lessonPlan->status);
+        }
+
+        $data = request()->validate([
+            'class_id' => 'required|integer|exists:classes,id',
+            'subject_id' => 'required|integer|exists:subjects,id',
+            'day' => 'nullable|integer|between:1,6',
+            'period' => 'nullable|integer|min:1',
+            'semester' => 'nullable|string|max:10',
+            'topic' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'unit' => 'nullable|string|max:255',
+            'plan_date' => 'required|date',
+        ]);
+
+        $lessonPlan->update($data);
+        audit_log('lesson_plan_update', "Updated lesson plan #{$lessonPlan->id}: {$data['topic']}");
+
+        return redirect()->back()->with('success', 'Lesson plan updated successfully');
+    }
+
     public function reject(LessonPlan $lessonPlan)
     {
         $user = Auth::user();
-        if (!$user->isHOD() && !$user->isPrincipal() && !$user->isAdmin()) {
+
+        if ($user->isHOD()) {
+            if ($lessonPlan->employee_id === $user->id) {
+                return redirect()->back()->with('error', 'You cannot reject your own lesson plan');
+            }
+            if ($lessonPlan->employee->department_id !== $user->department_id) {
+                return redirect()->back()->with('error', 'You can only reject plans from your department');
+            }
+        } elseif (!$user->isPrincipal() && !$user->isAdmin()) {
             return redirect()->back()->with('error', 'Unauthorized');
         }
 

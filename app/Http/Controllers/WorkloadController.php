@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
-use App\Models\TimetableSlot;
+use App\Models\Department;
 use App\Models\Workload;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -14,49 +13,67 @@ class WorkloadController extends Controller
     {
         $user = Auth::user();
 
-        $workloads = Workload::with('employee')
-            ->when(!$user->isAdmin() && !$user->isPrincipal() && !$user->isVicePrincipal(), fn($q) => $q->whereHas('employee', fn($q) => $q->where('department_id', $user->department_id)))
-            ->orderByDesc('computed_date')
-            ->get()
-            ->map(fn($w) => [
-                'id' => $w->id,
-                'employee_id' => $w->employee_id,
-                'total_hours' => $w->total_hours,
-                'period_week' => $w->period_week,
-                'computed_date' => $w->computed_date,
-                'employee' => $w->employee ? ['id' => $w->employee->id, 'emp_id' => $w->employee->emp_id, 'name' => $w->employee->name] : null,
-            ]);
+        $workloads = Workload::with('department')
+            ->whereHas('department', fn($q) => $q->where('code', '!=', '001'))
+            ->when($user->isStaff() || $user->isHOD(), fn($q) => $q->where('department_id', $user->department_id))
+            ->orderBy('year')->orderBy('subject_name')->get();
 
-        return Inertia::render('Workload/Index', ['workloads' => $workloads]);
+        $years = Workload::select('year')->distinct()->orderBy('year')->pluck('year');
+
+        $departments = Department::where('code', '!=', '001')->orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('Workload/Index', [
+            'workloads' => $workloads,
+            'years' => $years,
+            'departments' => $departments,
+        ]);
     }
 
-    public function calculate()
+    public function store()
     {
         $user = Auth::user();
-        if (!$user->isAdmin() && !$user->isPrincipal()) {
-            return redirect()->back()->with('error', 'Unauthorized');
+
+        $data = request()->validate([
+            'year' => 'required|string',
+            'sem_mode' => 'required|string|in:odd,even',
+            'department_id' => 'required|integer|exists:departments,id',
+            'subject_name' => 'required|string',
+            'total_hours' => 'required|numeric|min:0',
+        ]);
+
+        if ($user->isStaff() || $user->isHOD()) {
+            if ($data['department_id'] != $user->department_id) {
+                return redirect()->back()->with('error', 'You can only add workload for your own department');
+            }
         }
 
-        $employees = Employee::where('is_active', true)
-            ->when(!$user->isAdmin() && !$user->isPrincipal(), fn($q) => $q->where('department_id', $user->department_id))
-            ->get();
+        Workload::create($data);
+        audit_log('workload_create', "Created workload: {$data['subject_name']} - {$data['year']} - {$data['total_hours']}h");
 
-        $periodWeek = now()->format('Y-W');
-        $computedDate = now()->toDateString();
+        return redirect()->back()->with('success', 'Workload entry created successfully');
+    }
 
-        foreach ($employees as $employee) {
-            $totalHours = TimetableSlot::where('employee_id', $employee->id)
-                ->join('subjects', 'timetable.subject_id', '=', 'subjects.id')
-                ->sum('subjects.lecture_hours_per_week');
+    public function update(Workload $workload)
+    {
+        $user = Auth::user();
 
-            Workload::updateOrCreate(
-                ['employee_id' => $employee->id, 'period_week' => $periodWeek],
-                ['total_hours' => $totalHours, 'computed_date' => $computedDate]
-            );
+        $data = request()->validate([
+            'year' => 'required|string',
+            'sem_mode' => 'required|string|in:odd,even',
+            'department_id' => 'required|integer|exists:departments,id',
+            'subject_name' => 'required|string',
+            'total_hours' => 'required|numeric|min:0',
+        ]);
+
+        if ($user->isStaff() || $user->isHOD()) {
+            if ($data['department_id'] != $user->department_id) {
+                return redirect()->back()->with('error', 'You can only edit workload for your own department');
+            }
         }
 
-        audit_log('workload_calculate', "Calculated workload for period {$periodWeek}");
+        $workload->update($data);
+        audit_log('workload_update', "Updated workload #{$workload->id}: {$data['subject_name']} - {$data['year']} - {$data['total_hours']}h");
 
-        return redirect()->back()->with('success', 'Workload calculated successfully');
+        return redirect()->back()->with('success', 'Workload entry updated successfully');
     }
 }

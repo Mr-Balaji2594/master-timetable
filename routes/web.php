@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BulkUploadController;
 use App\Http\Controllers\ClassController;
+use App\Http\Controllers\CompensationController;
 use App\Http\Controllers\CommonPaperController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
@@ -37,7 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('classes', ClassController::class)->except(['show', 'edit', 'create'])->middleware('role:management');
     Route::resource('subjects', SubjectController::class)->except(['show', 'edit', 'create'])->middleware('role:management');
 
-    Route::resource('staff-subjects', StaffSubjectController::class)->except(['show', 'edit', 'create'])->middleware('role:admin,hod');
+    Route::resource('staff-subjects', StaffSubjectController::class)->except(['show', 'edit', 'create'])->middleware('role:any');
 
     Route::get('timetable', [TimetableController::class, 'index'])->name('timetable.index')->middleware('role:any');
     Route::post('timetable', [TimetableController::class, 'store'])->name('timetable.store')->middleware('role:any');
@@ -49,9 +50,18 @@ Route::middleware('auth')->group(function () {
     Route::post('leave/{leave}/reject', [LeaveController::class, 'reject'])->name('leave.reject')->middleware('role:hod,principal,admin');
 
     Route::resource('substitution', SubstitutionController::class)->except(['show', 'edit', 'create'])->middleware('role:any');
+    Route::post('substitution/{substitution}/complete', [SubstitutionController::class, 'complete'])->name('substitution.complete')->middleware('role:any');
+    Route::post('substitution/{substitution}/cancel', [SubstitutionController::class, 'cancel'])->name('substitution.cancel')->middleware('role:any');
+
+    Route::get('compensations', [CompensationController::class, 'index'])->name('compensations.index')->middleware('role:any');
+    Route::post('compensations', [CompensationController::class, 'store'])->name('compensations.store')->middleware('role:any');
+    Route::post('compensations/{compensation}/complete', [CompensationController::class, 'complete'])->name('compensations.complete')->middleware('role:any');
+    Route::post('compensations/{compensation}/approve', [CompensationController::class, 'approve'])->name('compensations.approve')->middleware('role:any');
+    Route::post('compensations/{compensation}/cancel', [CompensationController::class, 'cancel'])->name('compensations.cancel')->middleware('role:any');
 
     Route::get('workload', [WorkloadController::class, 'index'])->name('workload.index')->middleware('role:any');
-    Route::post('workload/calculate', [WorkloadController::class, 'calculate'])->name('workload.calculate')->middleware('role:admin,principal');
+    Route::post('workload', [WorkloadController::class, 'store'])->name('workload.store')->middleware('role:any');
+    Route::put('workload/{workload}', [WorkloadController::class, 'update'])->name('workload.update')->middleware('role:any');
 
     Route::resource('lesson-plans', LessonPlanController::class)->except(['show', 'edit', 'create'])->middleware('role:any');
     Route::post('lesson-plans/{lessonPlan}/approve-hod', [LessonPlanController::class, 'approveHod'])->name('lesson-plans.approve-hod')->middleware('role:hod,principal,admin');
