@@ -15,11 +15,20 @@ class EmployeeUserProvider implements UserProvider
 
     public function retrieveByToken($identifier, $token): ?Authenticatable
     {
-        return null;
+        if (empty($token)) {
+            return null;
+        }
+
+        return Employee::where('id', $identifier)
+            ->where('is_active', true)
+            ->where('remember_token', $token)
+            ->first();
     }
 
     public function updateRememberToken(Authenticatable $user, $token): void
     {
+        $user->remember_token = $token;
+        $user->save();
     }
 
     public function retrieveByCredentials(array $credentials): ?Authenticatable
@@ -28,9 +37,14 @@ class EmployeeUserProvider implements UserProvider
             return null;
         }
 
-        return Employee::where('emp_id', $credentials['emp_id'])
-            ->where('is_active', true)
-            ->first();
+        $query = Employee::where('emp_id', $credentials['emp_id'])
+            ->where('is_active', true);
+
+        if (isset($credentials['department_id']) && $credentials['department_id'] !== '') {
+            $query->where('department_id', $credentials['department_id']);
+        }
+
+        return $query->first();
     }
 
     public function validateCredentials(Authenticatable $user, array $credentials): bool

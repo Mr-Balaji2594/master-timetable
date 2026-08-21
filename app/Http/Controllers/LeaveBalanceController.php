@@ -24,13 +24,17 @@ class LeaveBalanceController extends Controller
                 'casual_leave_limit' => $e->casual_leave_limit,
                 'medical_leave_limit' => $e->medical_leave_limit,
                 'onduty_leave_limit' => $e->onduty_leave_limit,
-                'permission_limit' => $e->permission_limit,
+                'early_permission_limit' => $e->early_permission_limit,
+                'late_permission_limit' => $e->late_permission_limit,
                 'deputation_limit' => $e->deputation_limit,
+                'earned_leave_limit' => $e->earned_leave_limit,
                 'casual_leave_availed' => $e->casual_leave_availed,
                 'medical_leave_availed' => $e->medical_leave_availed,
                 'onduty_leave_availed' => $e->onduty_leave_availed,
-                'permission_availed' => $e->permission_availed,
+                'early_permission_availed' => $e->early_permission_availed,
+                'late_permission_availed' => $e->late_permission_availed,
                 'deputation_availed' => $e->deputation_availed,
+                'earned_leave_availed' => $e->earned_leave_availed,
             ]);
 
         return Inertia::render('LeaveBalance/Index', ['employees' => $employees]);
@@ -48,13 +52,17 @@ class LeaveBalanceController extends Controller
             'casual_leave_limit' => 'nullable|integer|min:0',
             'medical_leave_limit' => 'nullable|integer|min:0',
             'onduty_leave_limit' => 'nullable|integer|min:0',
-            'permission_limit' => 'nullable|integer|min:0',
+            'early_permission_limit' => 'nullable|integer|min:0',
+            'late_permission_limit' => 'nullable|integer|min:0',
             'deputation_limit' => 'nullable|integer|min:0',
-            'casual_leave_availed' => 'nullable|integer|min:0',
+            'earned_leave_limit' => 'nullable|integer|min:0',
+            'casual_leave_availed' => 'nullable|numeric|min:0',
             'medical_leave_availed' => 'nullable|integer|min:0',
             'onduty_leave_availed' => 'nullable|integer|min:0',
-            'permission_availed' => 'nullable|integer|min:0',
+            'early_permission_availed' => 'nullable|numeric|min:0',
+            'late_permission_availed' => 'nullable|numeric|min:0',
             'deputation_availed' => 'nullable|integer|min:0',
+            'earned_leave_availed' => 'nullable|integer|min:0',
         ]);
 
         $employee->update($data);
@@ -74,8 +82,10 @@ class LeaveBalanceController extends Controller
             'casual_leave_availed' => 0,
             'medical_leave_availed' => 0,
             'onduty_leave_availed' => 0,
-            'permission_availed' => 0,
+            'early_permission_availed' => 0,
+            'late_permission_availed' => 0,
             'deputation_availed' => 0,
+            'earned_leave_availed' => 0,
         ]);
 
         audit_log('leave_balance_reset', 'Reset all leave balances for new year');

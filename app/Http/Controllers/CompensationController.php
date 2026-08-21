@@ -6,6 +6,7 @@ use App\Models\Compensation;
 use App\Models\Employee;
 use App\Models\SchoolClass;
 use App\Models\Subject;
+use App\Models\SubstitutionDuty;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -59,6 +60,7 @@ class CompensationController extends Controller
     public function store()
     {
         $data = request()->validate([
+            'substitution_id' => 'required|integer|exists:substitution_duties,id',
             'original_employee_id' => 'required|integer|exists:employees,id',
             'substitute_employee_id' => 'required|integer|exists:employees,id|different:original_employee_id',
             'class_id' => 'required|integer|exists:classes,id',
@@ -68,10 +70,13 @@ class CompensationController extends Controller
             'leave_date' => 'required|date',
         ]);
 
+        $substitutionId = $data['substitution_id'];
+        unset($data['substitution_id']);
         $data['status'] = 'pending';
 
         Compensation::create($data);
-        audit_log('compensation_create', "Created compensation for substitution leave on {$data['leave_date']}");
+        SubstitutionDuty::where('id', $substitutionId)->update(['compensated' => true]);
+        audit_log('compensation_create', "Created compensation for substitution #{$substitutionId} on {$data['leave_date']}");
 
         return redirect()->back()->with('success', 'Compensation record created successfully');
     }

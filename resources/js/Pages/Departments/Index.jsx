@@ -37,8 +37,8 @@ export default function Index({ departments, employees }) {
     const submit = handleSubmit((formData) => {
         const done = () => { setShow(false); setEdit(null); reset({ name: '', code: '' }) }
         const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
-        edit ? router.put(`/departments/${edit.id}`, formData, { onSuccess: done, onError })
-            : router.post('/departments', formData, { onSuccess: done, onError })
+        edit ? router.put(`/departments/${edit.id}`, formData, { onSuccess: done, onError, preserveState: true })
+            : router.post('/departments', formData, { onSuccess: done, onError, preserveState: true })
     })
     const handleDelete = async (dept) => {
         const result = await showConfirm('Delete Department?', `Delete department ${dept.name}? This cannot be undone.`)
@@ -52,7 +52,7 @@ export default function Index({ departments, employees }) {
         { header: 'Staff Count', accessorKey: 'employees_count', cell: ({ getValue }) => getValue() ?? 0 },
         { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => (
             <>
-                {canManage && <Button size="sm" variant="outline-primary" className="me-1" onClick={() => openEdit(row.original)}><i className="bi bi-pencil"></i></Button>}
+                {canManage && <Button size="sm" variant="outline-primary" className="me-1" onClick={() => openEdit(row.original)}><i className="bi bi-pencil-square"></i></Button>}
                 {canManage && <Button size="sm" variant="outline-danger" onClick={() => handleDelete(row.original)}><i className="bi bi-trash"></i></Button>}
             </>
         )},

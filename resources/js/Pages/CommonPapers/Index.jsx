@@ -48,9 +48,9 @@ export default function Index({ commonSubjects, commonSubjectOptions, classes })
         const done = () => { setShow(false); setEdit(null); reset(defaults) }
         const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
         if (edit) {
-            router.put(`/common-papers/allocate/${edit.slot_ids[0]}`, formData, { onSuccess: done, onError })
+            router.put(`/common-papers/allocate/${edit.slot_ids[0]}`, formData, { onSuccess: done, onError, preserveState: true })
         } else {
-            router.post('/common-papers/allocate', formData, { onSuccess: done, onError })
+            router.post('/common-papers/allocate', formData, { onSuccess: done, onError, preserveState: true })
         }
     })
     const del = async (a) => {
@@ -83,7 +83,7 @@ export default function Index({ commonSubjects, commonSubjectOptions, classes })
                             </div>
                         </div>
                         {canAllocate && <div className="d-flex gap-1 flex-shrink-0">
-                            <Button size="sm" variant="outline-primary" onClick={() => openEdit(a)}><i className="bi bi-pencil"></i></Button>
+                            <Button size="sm" variant="outline-primary" onClick={() => openEdit(a)}><i className="bi bi-pencil-square"></i></Button>
                             <Button size="sm" variant="outline-danger" onClick={() => del(a)}><i className="bi bi-trash"></i></Button>
                         </div>}
                     </div>

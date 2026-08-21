@@ -9,9 +9,33 @@ export default function FormField({ name, label, control, errors, type = 'text',
       <Controller
         name={name}
         control={control}
-        render={({ field }) => (
-          <Form.Control {...field} type={type} isInvalid={!!error} {...rest} />
-        )}
+        render={({ field }) => {
+          const handleChange = (e) => {
+            let val = e.target.value
+            if (type === 'date' && val) {
+              const parts = val.split('-')
+              if (parts[0] && parts[0].length > 4) {
+                parts[0] = parts[0].slice(0, 4)
+                val = parts.join('-')
+                e.target.value = val
+              }
+            }
+            field.onChange(val)
+          }
+
+          const extra = type === 'date' ? { max: '9999-12-31' } : {}
+
+          return (
+            <Form.Control 
+              {...field} 
+              onChange={handleChange} 
+              type={type} 
+              isInvalid={!!error} 
+              {...extra} 
+              {...rest} 
+            />
+          )
+        }}
       />
       {error && <Form.Control.Feedback type="invalid">{error.message}</Form.Control.Feedback>}
     </Form.Group>

@@ -9,12 +9,13 @@ class LoginAttempt extends Model
     protected $table = 'login_attempts';
     public $timestamps = false;
 
-    protected $fillable = ['emp_id', 'ip_address', 'success'];
+    protected $fillable = ['emp_id', 'ip_address', 'success', 'user_agent'];
 
     protected function casts(): array
     {
         return [
             'success' => 'boolean',
+            'attempted_at' => 'datetime',
         ];
     }
 }

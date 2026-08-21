@@ -17,8 +17,12 @@ class SubstitutionController extends Controller
         $user = Auth::user();
 
         $substitutions = SubstitutionDuty::with(['originalEmployee', 'substituteEmployee', 'class', 'subject'])
-            ->when($user->isHOD(), fn($q) => $q->whereHas('originalEmployee', fn($q) => $q->where('department_id', $user->department_id)))
+            ->when($user->isHOD(), fn($q) => $q->where(function ($q) use ($user) {
+                $q->whereHas('originalEmployee', fn($q) => $q->where('department_id', $user->department_id))
+                    ->orWhereHas('substituteEmployee', fn($q) => $q->where('department_id', $user->department_id));
+            }))
             ->when($user->isStaff(), fn($q) => $q->where('substitute_employee_id', $user->id)->orWhere('original_employee_id', $user->id))
+            ->when(!$user->isAdmin(), fn($q) => $q->where('compensated', false))
             ->orderByDesc('leave_date')
             ->get()
             ->map(fn($s) => [
@@ -31,6 +35,7 @@ class SubstitutionController extends Controller
                 'period_no' => $s->period_no,
                 'leave_date' => $s->leave_date,
                 'status' => $s->status,
+                'compensated' => (bool) $s->compensated,
                 'compensation_hours' => $s->compensation_hours,
                 'original_employee' => $s->originalEmployee ? ['id' => $s->originalEmployee->id, 'name' => $s->originalEmployee->name] : null,
                 'substitute_employee' => $s->substituteEmployee ? ['id' => $s->substituteEmployee->id, 'name' => $s->substituteEmployee->name] : null,

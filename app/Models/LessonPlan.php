@@ -10,7 +10,7 @@ class LessonPlan extends Model
 
     protected $fillable = [
         'employee_id', 'class_id', 'subject_id',
-        'day', 'period', 'semester', 'topic', 'description',
+        'day', 'period', 'period_to', 'semester', 'topic', 'description',
         'unit', 'plan_date', 'status',
         'hod_approved_by', 'hod_approved_at',
         'principal_approved_by', 'principal_approved_at',
@@ -24,6 +24,7 @@ class LessonPlan extends Model
             'principal_approved_at' => 'datetime',
             'day' => 'integer',
             'period' => 'integer',
+            'period_to' => 'integer',
         ];
     }
 
@@ -40,6 +41,11 @@ class LessonPlan extends Model
     public function subject()
     {
         return $this->belongsTo(Subject::class, 'subject_id');
+    }
+
+    public function combinedClasses()
+    {
+        return $this->belongsToMany(SchoolClass::class, 'lesson_plan_classes', 'lesson_plan_id', 'class_id');
     }
 
     public function hodApprover()

@@ -9,31 +9,37 @@ class Employee extends Authenticatable
     public $timestamps = false;
 
     protected $fillable = [
-        'emp_id', 'department_id', 'name', 'designation',
+        'emp_id', 'department_id', 'name', 'designation', 'mode',
         'total_leave_per_year', 'casual_leave_limit', 'medical_leave_limit',
-        'onduty_leave_limit', 'permission_limit', 'deputation_limit',
+        'onduty_leave_limit', 'early_permission_limit', 'late_permission_limit', 'deputation_limit',
         'casual_leave_availed', 'medical_leave_availed', 'onduty_leave_availed',
-        'permission_availed', 'deputation_availed',
-        'role', 'password', 'is_active',
+        'early_permission_availed', 'late_permission_availed', 'deputation_availed',
+        'earned_leave_limit', 'earned_leave_availed',
+        'role', 'password', 'is_active', 'must_change_password',
     ];
 
-    protected $hidden = ['password'];
+    protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
             'total_leave_per_year' => 'integer',
             'casual_leave_limit' => 'integer',
             'medical_leave_limit' => 'integer',
             'onduty_leave_limit' => 'integer',
-            'permission_limit' => 'integer',
+            'early_permission_limit' => 'integer',
+            'late_permission_limit' => 'integer',
             'deputation_limit' => 'integer',
-            'casual_leave_availed' => 'integer',
+            'casual_leave_availed' => 'decimal:1',
             'medical_leave_availed' => 'integer',
             'onduty_leave_availed' => 'integer',
-            'permission_availed' => 'integer',
+            'early_permission_availed' => 'decimal:1',
+            'late_permission_availed' => 'decimal:1',
             'deputation_availed' => 'integer',
+            'earned_leave_limit' => 'integer',
+            'earned_leave_availed' => 'integer',
         ];
     }
 

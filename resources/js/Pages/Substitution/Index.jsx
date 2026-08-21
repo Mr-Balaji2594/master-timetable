@@ -13,6 +13,20 @@ import AuthenticatedLayout from '../../Layouts/Authenticated'
 
 const dayNames = ['I', 'II', 'III', 'IV', 'V', 'VI']
 
+const today = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const toIsoDate = (raw) => {
+    if (!raw) return today()
+    const s = String(raw)
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10)
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+    return today()
+}
+
 const schema = z.object({
     original_employee_id: z.string().min(1, 'Original staff is required'),
     substitute_employee_id: z.string().min(1, 'Substitute is required'),
@@ -24,6 +38,7 @@ const schema = z.object({
 })
 
 const compSchema = z.object({
+    substitution_id: z.string().min(1, 'Required'),
     original_employee_id: z.string().min(1, 'Required'),
     substitute_employee_id: z.string().min(1, 'Required'),
     class_id: z.string().min(1, 'Required'),
@@ -40,7 +55,7 @@ export default function Index({ substitutions, employees, allEmployees, classes,
     const [show, setShow] = useState(false)
     const [showComp, setShowComp] = useState(false)
     const [compSub, setCompSub] = useState(null)
-    const defaults = { original_employee_id: isStaff ? String(user.id) : '', substitute_employee_id: '', class_id: '', subject_id: '', day_of_week: '', period_no: '', leave_date: '' }
+    const defaults = { original_employee_id: isStaff ? String(user.id) : '', substitute_employee_id: '', class_id: '', subject_id: '', day_of_week: '', period_no: '', leave_date: today() }
     const { control, handleSubmit, reset, setError, formState: { errors } } = useForm({
         resolver: zodResolver(schema), defaultValues: defaults
     })
@@ -50,27 +65,26 @@ export default function Index({ substitutions, employees, allEmployees, classes,
     const submit = handleSubmit((formData) => {
         const done = () => { setShow(false); reset(defaults) }
         const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
-        router.post('/substitution', formData, { onSuccess: done, onError })
+        router.post('/substitution', formData, { onSuccess: done, onError, preserveState: true })
     })
     const openCompensation = (sub) => {
         setCompSub(sub)
-        const raw = sub.leave_date || ''
-        const leaveDate = raw.length >= 10 ? raw.substring(0, 10) : raw
         compForm.reset({
+            substitution_id: String(sub.id),
             original_employee_id: String(sub.substitute_employee?.id),
             substitute_employee_id: String(sub.original_employee?.id),
             class_id: String(sub.class_id),
             subject_id: String(sub.subject_id),
             day_of_week: String(sub.day_of_week),
             period_no: String(sub.period_no),
-            leave_date: leaveDate,
+            leave_date: toIsoDate(sub.leave_date),
         })
         setShowComp(true)
     }
     const submitComp = compForm.handleSubmit((formData) => {
         const done = () => { setShowComp(false); setCompSub(null); compForm.reset() }
         const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => compForm.setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
-        router.post('/compensations', formData, { onSuccess: done, onError })
+        router.post('/compensations', formData, { onSuccess: done, onError, preserveState: true })
     })
 
     return (
@@ -90,7 +104,7 @@ export default function Index({ substitutions, employees, allEmployees, classes,
                         { header: 'Substitute', accessorKey: 'substitute_employee.name' },
                         { header: 'Class', accessorKey: 'class.name' },
                         { header: 'Subject', accessorKey: 'subject.name' },
-                        { header: 'Day/Period', cell: ({ row }) => `${row.original.day_of_week}/${row.original.period_no}` },
+                        { header: 'Day/Period', cell: ({ row }) => `${dayNames[row.original.day_of_week - 1] || row.original.day_of_week}/${dayNames[row.original.period_no - 1] || row.original.period_no}` },
                         { header: 'Date', accessorKey: 'leave_date' },
                         { header: 'Status', accessorKey: 'status', cell: ({ getValue }) => {
                             const color = getValue() === 'completed' ? 'success' : getValue() === 'cancelled' ? 'danger' : 'warning'
@@ -98,7 +112,9 @@ export default function Index({ substitutions, employees, allEmployees, classes,
                         }},
                         { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => {
                             const s = row.original
-                            return (
+                            return s.compensated ? (
+                                <Badge bg="info" style={{ fontSize: '11px' }}><i className="bi bi-check-circle me-1"></i>Compensated</Badge>
+                            ) : (
                                 s.status === 'pending' && (
                                     <Button size="sm" variant="outline-info" onClick={() => openCompensation(s)}>
                                         <i className="bi bi-arrow-left-right me-1"></i>Compensation
@@ -140,7 +156,7 @@ export default function Index({ substitutions, employees, allEmployees, classes,
                             <Col md={4}><Select2Field name="day_of_week" label="Day" control={control} errors={errors}
                                 options={dayNames.map((d, i) => ({ value: String(i + 1), label: d }))} isClearable={false} /></Col>
                             <Col md={4}><Select2Field name="period_no" label="Period" control={control} errors={errors}
-                                options={[1, 2, 3, 4, 5, 6].map(p => ({ value: String(p), label: String(p) }))} isClearable={false} /></Col>
+                                options={dayNames.map((p, i) => ({ value: String(i + 1), label: p }))} isClearable={false} /></Col>
                             <Col md={4}><FormField name="leave_date" label="Date" type="date" control={control} errors={errors} /></Col>
                         </Row>
                     </Modal.Body>
@@ -189,7 +205,7 @@ export default function Index({ substitutions, employees, allEmployees, classes,
                             </Col>
                             <Col md={4}>
                                 <Select2Field name="period_no" label="Period" control={compForm.control} errors={compForm.formState.errors}
-                                    options={[1, 2, 3, 4, 5, 6].map(p => ({ value: String(p), label: String(p) }))} isClearable={false} />
+                                    options={dayNames.map((p, i) => ({ value: String(i + 1), label: p }))} isClearable={false} />
                             </Col>
                             <Col md={4}>
                                 <FormField name="leave_date" label="Date" type="date" control={compForm.control} errors={compForm.formState.errors} />
@@ -198,6 +214,7 @@ export default function Index({ substitutions, employees, allEmployees, classes,
                         <input type="hidden" {...compForm.register('original_employee_id')} />
                         <input type="hidden" {...compForm.register('substitute_employee_id')} />
                         <input type="hidden" {...compForm.register('class_id')} />
+                        <input type="hidden" {...compForm.register('substitution_id')} />
                     </Modal.Body>
                     <Modal.Footer>
                         <Button variant="secondary" onClick={() => setShowComp(false)}>Cancel</Button>

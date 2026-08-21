@@ -21,14 +21,17 @@ class ClassController extends Controller
 
         $classes = SchoolClass::with('department')
             ->when(!$user->isAdmin() && !$user->isPrincipal() && !$user->isVicePrincipal(), fn($q) => $q->where('department_id', $user->department_id))
-            ->orderBy('name')
+            ->orderByRaw("(name REGEXP '^[0-9]+$') DESC, CAST(name AS UNSIGNED) ASC, name ASC")
             ->get()
             ->map(fn($c) => [
                 'id' => $c->id,
                 'name' => $c->name,
                 'department_id' => $c->department_id,
+                'program_type' => $c->program_type,
                 'batch_year' => $c->batch_year,
                 'year' => $c->year,
+                'block' => $c->block,
+                'floor' => $c->floor,
                 'department' => $c->department ? ['id' => $c->department->id, 'name' => $c->department->name] : null,
             ]);
 
@@ -49,8 +52,11 @@ class ClassController extends Controller
         $data = request()->validate([
             'name' => 'required|string|max:255',
             'department_id' => 'required|integer|exists:departments,id',
+            'program_type' => 'required|string|in:UG,PG',
             'batch_year' => 'nullable',
             'year' => 'nullable',
+            'block' => 'nullable|string|in:Main,Old,New',
+            'floor' => 'nullable|string|in:Ground,Floor 1,Floor 2',
         ]);
 
         SchoolClass::create($data);
@@ -68,8 +74,11 @@ class ClassController extends Controller
         $data = request()->validate([
             'name' => 'required|string|max:255',
             'department_id' => 'required|integer|exists:departments,id',
+            'program_type' => 'required|string|in:UG,PG',
             'batch_year' => 'nullable',
             'year' => 'nullable',
+            'block' => 'nullable|string|in:Main,Old,New',
+            'floor' => 'nullable|string|in:Ground,Floor 1,Floor 2',
         ]);
 
         $class->update($data);

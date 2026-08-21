@@ -94,13 +94,40 @@ class DashboardController extends Controller
                 ->where('day_of_week', $dayOfWeek === 0 ? 7 : $dayOfWeek)
                 ->orderBy('period_no')
                 ->get()
-                ->map(fn($s) => [
-                    'id' => $s->id,
-                    'period_no' => $s->period_no,
-                    'class' => $s->class ? ['name' => $s->class->name] : null,
-                    'subject' => $s->subject ? ['name' => $s->subject->name, 'code' => $s->subject->code] : null,
-                    'room_no' => $s->room_no,
-                ]);
+                ->groupBy('period_no')
+                ->flatMap(function ($group) {
+                    $rows = collect();
+
+                    $group->filter(fn($s) => $s->combined_group_id)
+                        ->groupBy('combined_group_id')
+                        ->each(function ($cg) use ($rows) {
+                            $first = $cg->first();
+                            $rows->push([
+                                'id' => $first->id,
+                                'period_no' => $first->period_no,
+                                'class' => ['name' => $cg->map(fn($s) => $s->class?->name)->filter()->join(', ')],
+                                'is_combined' => true,
+                                'subject' => $first->subject ? ['name' => $first->subject->name, 'code' => $first->subject->code] : null,
+                                'room_no' => $first->room_no,
+                            ]);
+                        });
+
+                    $group->filter(fn($s) => !$s->combined_group_id)
+                        ->each(function ($s) use ($rows) {
+                            $rows->push([
+                                'id' => $s->id,
+                                'period_no' => $s->period_no,
+                                'class' => $s->class ? ['name' => $s->class->name] : null,
+                                'is_combined' => false,
+                                'subject' => $s->subject ? ['name' => $s->subject->name, 'code' => $s->subject->code] : null,
+                                'room_no' => $s->room_no,
+                            ]);
+                        });
+
+                    return $rows;
+                })
+                ->sortBy('period_no')
+                ->values();
         }
 
         return Inertia::render('Dashboard', [

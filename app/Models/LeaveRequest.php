@@ -10,7 +10,7 @@ class LeaveRequest extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'employee_id', 'leave_date', 'due_date', 'nature', 'days',
+        'employee_id', 'leave_date', 'due_date', 'start_time', 'due_time', 'nature', 'days',
         'reason', 'status',
         'hod_approved_by', 'hod_approved_at',
         'principal_approved_by', 'principal_approved_at',
@@ -21,7 +21,7 @@ class LeaveRequest extends Model
         return [
             'leave_date' => 'date',
             'due_date' => 'date',
-            'days' => 'integer',
+            'days' => 'decimal:1',
             'hod_approved_at' => 'datetime',
             'principal_approved_at' => 'datetime',
         ];

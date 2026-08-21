@@ -9,7 +9,7 @@ class SchoolClass extends Model
     protected $table = 'classes';
     public $timestamps = false;
 
-    protected $fillable = ['name', 'department_id', 'batch_year', 'year'];
+    protected $fillable = ['name', 'department_id', 'program_type', 'batch_year', 'year', 'block', 'floor'];
 
     public function department()
     {

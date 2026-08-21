@@ -14,6 +14,7 @@ const customStyles = {
     input: (base) => ({ ...base, fontSize: '0.875rem', color: '#0f172a' }),
     singleValue: (base) => ({ ...base, color: '#0f172a', fontSize: '0.875rem' }),
     menu: (base) => ({ ...base, zIndex: 9999, fontSize: '0.875rem', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)' }),
+    menuPortal: (base) => ({ ...base, zIndex: 99999 }),
     menuList: (base) => ({ ...base, maxHeight: 220, overflowY: 'auto' }),
     option: (base, state) => ({
         ...base,
@@ -58,6 +59,7 @@ export default function Select2({ options, value, onChange, placeholder = 'Selec
             aria-required={required}
             maxMenuHeight={220}
             noOptionsMessage={() => 'No options'}
+            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
         />
     )
 }

@@ -22,6 +22,7 @@ export default function Index({ assignments, employees, subjects, departments })
     const user = auth?.user
     const [show, setShow] = useState(false)
     const [selectedEmp, setSelectedEmp] = useState(user?.role === 'staff' ? user.id : '')
+    const [subjectSearch, setSubjectSearch] = useState('')
 
     const isStaff = user?.role === 'staff'
     const canAssign = ['admin', 'super_admin', 'hod'].includes(user?.role)
@@ -45,17 +46,22 @@ export default function Index({ assignments, employees, subjects, departments })
     }, [formEmpId, assignments])
 
     const subjectsByDept = useMemo(() => {
+        const q = subjectSearch.trim().toLowerCase()
+        const filteredSubjects = q
+            ? subjects.filter(s => (s.name || '').toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q))
+            : subjects
         const map = {}
-        subjects.forEach(s => {
+        filteredSubjects.forEach(s => {
             const deptName = s.department?.name || 'Unknown'
             if (!map[deptName]) map[deptName] = []
             map[deptName].push(s)
         })
         return map
-    }, [subjects])
+    }, [subjects, subjectSearch])
 
     const openAssign = (empId) => {
         reset({ ...defaults, employee_id: empId ?? '' })
+        setSubjectSearch('')
         setShow(true)
     }
 
@@ -71,7 +77,7 @@ export default function Index({ assignments, employees, subjects, departments })
     const submit = handleSubmit((formData) => {
         const done = () => { setShow(false); reset(defaults) }
         const onError = (serverErrors) => Object.entries(serverErrors).forEach(([k, msgs]) => setError(k, { message: Array.isArray(msgs) ? msgs[0] : msgs }))
-        router.post('/staff-subjects', formData, { onSuccess: done, onError })
+        router.post('/staff-subjects', formData, { onSuccess: done, onError, preserveState: true })
     })
 
     const handleDelete = async (assignment) => {
@@ -101,7 +107,7 @@ export default function Index({ assignments, employees, subjects, departments })
                         { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => (
                             canAssign ? (
                                 <>
-                                    <Button size="sm" variant="outline-primary" className="me-1" onClick={() => openAssign(String(row.original.employee_id))}><i className="bi bi-pencil"></i></Button>
+                                    <Button size="sm" variant="outline-primary" className="me-1" onClick={() => openAssign(String(row.original.employee_id))}><i className="bi bi-pencil-square"></i></Button>
                                     <Button size="sm" variant="outline-danger" onClick={() => handleDelete(row.original)}><i className="bi bi-trash"></i></Button>
                                 </>
                             ) : null
@@ -119,8 +125,15 @@ export default function Index({ assignments, employees, subjects, departments })
                             options={employees.map(e => ({ value: e.id, label: `${e.name} (${e.emp_id})` }))} isClearable={false} />}
                         <Form.Label>Subjects</Form.Label>
                         {errors.subject_ids && <div className="invalid-feedback d-block mb-1">{errors.subject_ids.message}</div>}
+                        <Form.Control
+                            type="search"
+                            placeholder="Search subjects..."
+                            value={subjectSearch}
+                            onChange={e => setSubjectSearch(e.target.value)}
+                            className="mb-3"
+                        />
                         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                            {Object.entries(subjectsByDept).map(([deptName, deptSubjects]) => (
+                            {Object.entries(subjectsByDept).length > 0 ? Object.entries(subjectsByDept).map(([deptName, deptSubjects]) => (
                                 <div key={deptName} className="mb-3">
                                     <Badge bg="secondary" className="mb-2 px-3 py-2 fs-6 fw-semibold w-100 text-start" style={{ borderRadius: '6px', background: '#f1f5f9', color: '#475569', fontSize: '13px' }}>
                                         {deptName}
@@ -149,7 +162,12 @@ export default function Index({ assignments, employees, subjects, departments })
                                         })}
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="empty-state">
+                                    <i className="bi bi-search"></i>
+                                    <p>No subjects match your search</p>
+                                </div>
+                            )}
                         </div>
                     </Modal.Body>
                     <Modal.Footer>

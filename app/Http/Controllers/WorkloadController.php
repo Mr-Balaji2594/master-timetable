@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\Subject;
 use App\Models\Workload;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -22,10 +23,16 @@ class WorkloadController extends Controller
 
         $departments = Department::where('code', '!=', '001')->orderBy('name')->get(['id', 'name']);
 
+        $subjects = Subject::whereNotNull('name')
+            ->when(!$user->isAdmin() && !$user->isPrincipal() && !$user->isVicePrincipal(), fn($q) => $q->where('department_id', $user->department_id))
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'department_id']);
+
         return Inertia::render('Workload/Index', [
             'workloads' => $workloads,
             'years' => $years,
             'departments' => $departments,
+            'subjects' => $subjects,
         ]);
     }
 

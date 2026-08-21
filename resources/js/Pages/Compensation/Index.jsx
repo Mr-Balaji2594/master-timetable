@@ -51,7 +51,7 @@ export default function Index({ compensations }) {
                                     {c.status === 'pending' && isSubstitute && (
                                         <Button size="sm" variant="outline-success" className="me-1" onClick={async () => {
                                             const r = await confirm({ title: 'Complete Compensation?', text: 'Confirm that the compensation duty has been completed?', confirmText: 'Complete', color: '#198754' })
-                                            if (r.isConfirmed) router.post(`/compensations/${c.id}/complete`)
+                                            if (r.isConfirmed) router.post(`/compensations/${c.id}/complete`, {}, { preserveState: true })
                                         }}>
                                             <i className="bi bi-check"></i> Complete
                                         </Button>
@@ -59,15 +59,15 @@ export default function Index({ compensations }) {
                                     {c.status === 'completed' && canManage && (
                                         <Button size="sm" variant="outline-primary" className="me-1" onClick={async () => {
                                             const r = await confirm({ title: 'Final Approve Compensation?', text: 'Give final approval for this compensation?', confirmText: 'Approve', color: '#0d6efd' })
-                                            if (r.isConfirmed) router.post(`/compensations/${c.id}/approve`)
+                                            if (r.isConfirmed) router.post(`/compensations/${c.id}/approve`, {}, { preserveState: true })
                                         }}>
                                             <i className="bi bi-check-all"></i> Approve
                                         </Button>
                                     )}
-                                    {['pending', 'completed'].includes(c.status) && canManage && (
+                                    {c.status === 'pending' && canManage && (
                                         <Button size="sm" variant="outline-danger" onClick={async () => {
                                             const r = await confirm({ title: 'Cancel Compensation?', text: 'Cancel this compensation?', confirmText: 'Cancel', color: '#dc3545' })
-                                            if (r.isConfirmed) router.post(`/compensations/${c.id}/cancel`)
+                                            if (r.isConfirmed) router.post(`/compensations/${c.id}/cancel`, {}, { preserveState: true })
                                         }}>
                                             <i className="bi bi-x"></i> Cancel
                                         </Button>

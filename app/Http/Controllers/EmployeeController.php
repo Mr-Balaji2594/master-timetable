@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Rules\StrongPassword;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -23,7 +24,7 @@ class EmployeeController extends Controller
         $employees = Employee::with('department')
             ->when(request('department_id'), fn($q, $v) => $q->where('department_id', $v))
             ->when(!$user->isAdmin() && !$user->isPrincipal() && !$user->isVicePrincipal(), fn($q) => $q->where('department_id', $user->department_id))
-            ->orderBy('name')
+            ->orderBy('emp_id')
             ->get()
             ->map(fn($e) => [
                 'id' => $e->id,
@@ -31,6 +32,7 @@ class EmployeeController extends Controller
                 'department_id' => $e->department_id,
                 'name' => $e->name,
                 'designation' => $e->designation,
+                'mode' => $e->mode ?? 'permanent',
                 'role' => $e->role,
 
                 'is_active' => $e->is_active,
@@ -57,12 +59,15 @@ class EmployeeController extends Controller
             'department_id' => 'required|integer|exists:departments,id',
             'name' => 'required|string|max:255',
             'designation' => 'nullable|string|max:255',
+            'mode' => 'nullable|string|in:permanent,temporary,contract',
             'role' => 'required|string|in:super_admin,admin,principal,vice_principal,hod,staff',
-            'password' => 'required|string|min:6',
+            'password' => ['required', 'string', new StrongPassword],
         ]);
 
         $data['password'] = Hash::make($data['password']);
         $data['is_active'] = true;
+        $data['mode'] = $data['mode'] ?? 'permanent';
+        $data['must_change_password'] = true;
 
         Employee::create($data);
         audit_log('employee_create', "Created employee: {$data['emp_id']} - {$data['name']}");
@@ -81,13 +86,15 @@ class EmployeeController extends Controller
             'department_id' => 'required|integer|exists:departments,id',
             'name' => 'required|string|max:255',
             'designation' => 'nullable|string|max:255',
+            'mode' => 'nullable|string|in:permanent,temporary,contract',
             'role' => 'required|string|in:super_admin,admin,principal,vice_principal,hod,staff',
             'is_active' => 'boolean',
         ]);
 
         if (request('password')) {
-            request()->validate(['password' => 'string|min:6']);
+            request()->validate(['password' => ['string', new StrongPassword]]);
             $data['password'] = Hash::make(request('password'));
+            $data['must_change_password'] = true;
         }
 
         $employee->update($data);
@@ -116,10 +123,33 @@ class EmployeeController extends Controller
             return redirect()->back()->with('error', 'Unauthorized');
         }
 
-        $defaultPassword = 'password123';
-        $employee->update(['password' => Hash::make($defaultPassword)]);
+        $tempPassword = generate_temp_password();
+        $employee->update([
+            'password' => Hash::make($tempPassword),
+            'must_change_password' => true,
+        ]);
         audit_log('employee_password_reset', "Reset password for employee: {$employee->emp_id}");
 
-        return redirect()->back()->with('success', "Password reset to: {$defaultPassword}");
+        return redirect()->back()->with('success', "Temporary password set for {$employee->emp_id}: {$tempPassword}");
+    }
+
+    public function toggleStatus(Employee $employee)
+    {
+        if (!$this->canModify()) {
+            return redirect()->back()->with('error', 'Unauthorized');
+        }
+
+        // Prevent deactivating your own account
+        if ($employee->id === Auth::id()) {
+            return redirect()->back()->with('error', 'You cannot change your own account status.');
+        }
+
+        $newStatus = !$employee->is_active;
+        $employee->update(['is_active' => $newStatus]);
+
+        $statusLabel = $newStatus ? 'activated' : 'deactivated';
+        audit_log('employee_status_change', "Employee {$employee->emp_id} ({$employee->name}) {$statusLabel}");
+
+        return redirect()->back()->with('success', "Employee {$employee->name} has been {$statusLabel}.");
     }
 }
