@@ -18,7 +18,17 @@ class LessonPlanController extends Controller
 
         $plans = LessonPlan::with(['employee', 'class.department', 'subject.department', 'hodApprover', 'principalApprover', 'combinedClasses.department'])
             ->when($user->isStaff(), fn($q) => $q->where('employee_id', $user->id))
-            ->when($user->isHOD(), fn($q) => $q->whereHas('employee', fn($q) => $q->where('department_id', $user->department_id)))
+            ->when($user->isHOD(), fn($q) => $q->where(function ($q) use ($user) {
+                $q->where('employee_id', $user->id)
+                    ->orWhere(function ($w) use ($user) {
+                        $w->whereHas('employee', fn($e) => $e->where('department_id', $user->department_id))
+                            ->where(fn($s) => $s->whereNull('status')->orWhere('status', 'pending_hod'));
+                    });
+            }))
+            ->when($user->isPrincipal(), fn($q) => $q->where(function ($q) use ($user) {
+                $q->where('employee_id', $user->id)
+                    ->orWhere('status', 'pending_principal');
+            }))
             ->orderByDesc('plan_date')
             ->get()
             ->map(fn($p) => [
@@ -70,7 +80,7 @@ class LessonPlanController extends Controller
 
         $data = $this->validatedPlanData();
         $data['employee_id'] = $user->id;
-        $data['status'] = $user->isHOD() ? 'pending_principal' : 'pending_hod';
+        $data['status'] = ($user->isHOD() || $user->isPrincipal()) ? 'pending_principal' : 'pending_hod';
 
         $plan = LessonPlan::create($data);
         $this->applyCombinedClasses($plan, $data);
@@ -148,6 +158,10 @@ class LessonPlanController extends Controller
             return redirect()->back()->with('error', 'Cannot edit a lesson plan that is already ' . $lessonPlan->status);
         }
 
+        if ($user->isStaff() && ($lessonPlan->status ?: 'pending_hod') !== 'pending_hod') {
+            return redirect()->back()->with('error', 'Lesson plan can only be edited while pending HOD approval');
+        }
+
         $data = $this->validatedPlanData();
 
         $lessonPlan->update($data);
@@ -192,6 +206,16 @@ class LessonPlanController extends Controller
 
         if ($user->isHOD() && $lessonPlan->employee_id !== $user->id && $lessonPlan->employee->department_id !== $user->department_id) {
             return redirect()->back()->with('error', 'You can only delete plans from your department');
+        }
+
+        $status = $lessonPlan->status ?: 'pending_hod';
+
+        if (in_array($status, ['approved', 'rejected']) && !$user->isAdmin() && !$user->isPrincipal()) {
+            return redirect()->back()->with('error', 'Cannot delete a lesson plan that is already ' . $status);
+        }
+
+        if ($user->isStaff() && $status !== 'pending_hod') {
+            return redirect()->back()->with('error', 'Lesson plan can only be deleted while pending HOD approval');
         }
 
         $topic = $lessonPlan->topic;

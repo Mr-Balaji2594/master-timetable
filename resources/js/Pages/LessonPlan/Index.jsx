@@ -171,6 +171,28 @@ export default function Index({ plans, classes, subjects, employees }) {
         return false
     }
 
+    const isPlanManager = ['admin', 'super_admin', 'principal', 'vice_principal'].includes(user?.role)
+
+    const canEditPlan = (lp) => {
+        const s = lp.status || 'pending_hod'
+        if (['approved', 'rejected'].includes(s)) return false
+        if (isPlanManager) return true
+        const isOwner = user?.id === lp.employee_id
+        const isDeptHod = user?.role === 'hod' && lp.employee_id !== user.id
+        if (!isOwner && !isDeptHod) return false
+        return user?.role === 'staff' ? s === 'pending_hod' : true
+    }
+
+    const canDeletePlan = (lp) => {
+        const s = lp.status || 'pending_hod'
+        const isOwner = user?.id === lp.employee_id
+        const isDeptHod = user?.role === 'hod' && lp.employee_id !== user.id
+        const isManagement = ['admin', 'super_admin', 'principal'].includes(user?.role)
+        if (!(isOwner || isManagement || isDeptHod)) return false
+        if (['approved', 'rejected'].includes(s)) return isManagement
+        return user?.role === 'staff' ? s === 'pending_hod' : true
+    }
+
     const selectable = filtered.filter(canBulkSelect)
     const allSelected = selectable.length > 0 && selectable.every(lp => selected.has(lp.id))
 
@@ -232,7 +254,7 @@ export default function Index({ plans, classes, subjects, employees }) {
                                 { value: 'pending_principal', label: 'Pending Principal' },
                                 { value: 'approved', label: 'Approved' },
                                 { value: 'rejected', label: 'Rejected' },
-                            ]} placeholder="All Status" /></Col>
+                            ].filter(o => !(user?.role === 'principal' && o.value === 'pending_hod'))} placeholder="All Status" /></Col>
                     </Row>
                     {isApprover && selected.size > 0 && (
                         <Row className="mb-3 g-2 align-items-center p-2 bg-light rounded border">
@@ -299,7 +321,7 @@ export default function Index({ plans, classes, subjects, employees }) {
                         { header: 'Status', accessorKey: 'status', cell: ({ getValue }) => <Badge bg={statusColors[getValue()] || 'secondary'}>{getValue()}</Badge> },
                         { header: 'Actions', id: 'actions', enableSorting: false, cell: ({ row }) => (
                             <>
-                                {(user?.id === row.original.employee_id || ['admin', 'super_admin', 'principal', 'vice_principal'].includes(user?.role) || (user?.role === 'hod' && row.original.employee_id !== user.id)) && !['approved', 'rejected'].includes(row.original.status) && (
+                                {canEditPlan(row.original) && (
                                     <Button size="sm" variant="outline-primary" className="me-1" onClick={() => openEdit(row.original)}>
                                         <i className="bi bi-pencil-square"></i>
                                     </Button>
@@ -328,7 +350,7 @@ export default function Index({ plans, classes, subjects, employees }) {
                                         <i className="bi bi-x"></i> Reject
                                     </Button>
                                 )}
-                                {(user?.id === row.original.employee_id || ['admin', 'super_admin', 'principal'].includes(user?.role) || (user?.role === 'hod' && row.original.employee_id !== user.id)) && (
+                                {canDeletePlan(row.original) && (
                                     <Button size="sm" variant="outline-danger" onClick={async () => {
                                         const r = await showConfirmCustom({ title: 'Delete Plan?', text: 'Delete this lesson plan permanently?', confirmText: 'Delete', confirmColor: '#dc3545' })
                                         if (r.isConfirmed) router.delete(`/lesson-plans/${row.original.id}`)
@@ -505,7 +527,7 @@ export default function Index({ plans, classes, subjects, employees }) {
                         </Button>
                     )}
                     <Button variant="secondary" onClick={() => setShowDetail(false)}>Close</Button>
-                    {detail && (user?.id === detail.employee_id || ['admin', 'super_admin', 'principal'].includes(user?.role) || (user?.role === 'hod' && detail.employee_id !== user.id)) && (
+                    {detail && canDeletePlan(detail) && (
                         <Button variant="danger" onClick={async () => {
                             const r = await showConfirmCustom({ title: 'Delete Plan?', text: 'Delete this lesson plan permanently?', confirmText: 'Delete', confirmColor: '#dc3545' })
                             if (r.isConfirmed) router.delete(`/lesson-plans/${detail.id}`, {}, { onSuccess: () => setShowDetail(false) })

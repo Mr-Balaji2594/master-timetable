@@ -173,18 +173,6 @@ export default function Login({ departments }) {
                         </div>
                     </Form.Group>
 
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                        <Form.Check
-                            type="checkbox"
-                            id="remember-me"
-                            label="Remember me"
-                            checked={data.remember}
-                            onChange={(e) =>
-                                setData("remember", e.target.checked)
-                            }
-                        />
-                    </div>
-
                     <Button
                         type="submit"
                         variant="primary"

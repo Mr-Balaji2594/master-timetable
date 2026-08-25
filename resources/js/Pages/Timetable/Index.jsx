@@ -299,6 +299,7 @@ export default function Index({ slots, employees, classes, allClasses, subjects 
         const primary = group.slots.find(x => x.id === groupId) || group.slots[0]
         const hasMixedSubjects = group.slots.some(x => x.subject_id !== primary.subject_id)
         const editable = canEditSlot(primary)
+
         return (
             <div key={primary.id} className={`slot-group combined-group ${editable ? 'clickable' : ''}`} onClick={cellClick} title={editable ? 'Click to edit combined class' : undefined}>
                 <div className="combined-header">
@@ -538,6 +539,7 @@ export default function Index({ slots, employees, classes, allClasses, subjects 
                                 <Row className="px-2 mb-1 small text-muted fw-semibold">
                                     <Col md={6}>Class</Col>
                                     <Col md={5}>Subject</Col>
+                                    <Col md={1}></Col>
                                 </Row>
                                 {combined.map((c, idx) => (
                                     <div key={idx} className="border rounded p-2 mb-2">

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('compensation', function (Blueprint $table) {
+        Schema::table('compensations', function (Blueprint $table) {
             $table->date('compensation_date')->nullable()->change();
             $table->tinyInteger('compensation_period')->nullable()->change();
         });
@@ -19,7 +19,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('compensation', function (Blueprint $table) {
+        Schema::table('compensations', function (Blueprint $table) {
             $table->date('compensation_date')->nullable(false)->change();
             $table->tinyInteger('compensation_period')->nullable(false)->change();
         });

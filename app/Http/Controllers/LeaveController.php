@@ -25,14 +25,24 @@ class LeaveController extends Controller
 
         $leaves = LeaveRequest::with(['employee', 'hodApprover', 'principalApprover'])
             ->when($user->isStaff(), fn($q) => $q->where('employee_id', $user->id))
-            ->when($user->isHOD(), fn($q) => $q->whereHas('employee', fn($q) => $q->where('department_id', $user->department_id)))
+            ->when($user->isHOD(), fn($q) => $q->where(function ($q) use ($user) {
+                $q->where('employee_id', $user->id)
+                    ->orWhere(function ($w) use ($user) {
+                        $w->whereHas('employee', fn($e) => $e->where('department_id', $user->department_id))
+                            ->where(fn($s) => $s->whereNull('status')->orWhere('status', 'pending_hod'));
+                    });
+            }))
+            ->when($user->isPrincipal(), fn($q) => $q->where(function ($q) use ($user) {
+                $q->where('employee_id', $user->id)
+                    ->orWhere('status', 'pending_principal');
+            }))
             ->orderByDesc('leave_date')
             ->get()
             ->map(fn($l) => [
                 'id' => $l->id,
                 'employee_id' => $l->employee_id,
-                'leave_date' => $l->leave_date,
-                'due_date' => $l->due_date,
+                'leave_date' => $l->leave_date?->format('Y-m-d'),
+                'due_date' => $l->due_date?->format('Y-m-d'),
                 'start_time' => $l->start_time,
                 'due_time' => $l->due_time,
                 'nature' => $l->nature,
@@ -77,7 +87,7 @@ class LeaveController extends Controller
 
         $data = $this->validatedLeaveData();
         $data['employee_id'] = $user->id;
-        $data['status'] = $user->isHOD() ? 'pending_principal' : 'pending_hod';
+        $data['status'] = ($user->isHOD() || $user->isPrincipal()) ? 'pending_principal' : 'pending_hod';
 
         LeaveRequest::create($data);
         $timeDetail = $data['start_time'] ? " from {$data['start_time']} to {$data['due_time']}" : '';
@@ -98,6 +108,10 @@ class LeaveController extends Controller
             return redirect()->back()->with('error', 'Cannot edit a leave request that is already ' . $leave->status);
         }
 
+        if ($user->isStaff() && ($leave->status ?: 'pending_hod') !== 'pending_hod') {
+            return redirect()->back()->with('error', 'Leave can only be edited while pending HOD approval');
+        }
+
         $data = $this->validatedLeaveData();
         $leave->update($data);
 
@@ -116,6 +130,10 @@ class LeaveController extends Controller
 
         if (in_array($leave->status, ['approved', 'rejected'])) {
             return redirect()->back()->with('error', 'Cannot delete a leave request that is already ' . $leave->status);
+        }
+
+        if ($user->isStaff() && ($leave->status ?: 'pending_hod') !== 'pending_hod') {
+            return redirect()->back()->with('error', 'Leave can only be deleted while pending HOD approval');
         }
 
         $leave->delete();

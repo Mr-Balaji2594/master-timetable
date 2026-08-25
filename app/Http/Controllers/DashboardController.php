@@ -31,7 +31,7 @@ class DashboardController extends Controller
                 'subjects_count' => Subject::count(),
             ];
             $pendingLeaves = LeaveRequest::with('employee')
-                ->whereIn('status', ['pending_hod', 'pending_principal'])
+                ->whereIn('status', $user->isPrincipal() ? ['pending_principal'] : ['pending_hod', 'pending_principal'])
                 ->orderByDesc('leave_date')
                 ->take(5)
                 ->get()

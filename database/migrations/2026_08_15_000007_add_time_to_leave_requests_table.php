@@ -9,7 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('leave_requests', function (Blueprint $table) {
-            $table->dropColumn('time');
+            if (Schema::hasColumn('leave_requests', 'time')) {
+                $table->dropColumn('time');
+            }
             $table->time('start_time')->nullable()->after('due_date');
             $table->time('due_time')->nullable()->after('start_time');
         });

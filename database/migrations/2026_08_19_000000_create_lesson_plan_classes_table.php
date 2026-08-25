@@ -11,8 +11,8 @@ return new class extends Migration
         if (!Schema::hasTable('lesson_plan_classes')) {
             Schema::create('lesson_plan_classes', function (Blueprint $table) {
                 $table->id();
-                $table->integer('lesson_plan_id');
-                $table->integer('class_id');
+$table->unsignedBigInteger('lesson_plan_id');
+            $table->unsignedBigInteger('class_id');
 
                 $table->unique(['lesson_plan_id', 'class_id']);
 

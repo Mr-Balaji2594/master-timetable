@@ -128,21 +128,26 @@ export default function Index({ leaves, employees, leaveBalance }) {
         reset({
             ...defaults,
             employee_id: String(l.employee_id ?? user.id),
-            leave_date: l.leave_date || '',
-            due_date: l.due_date || '',
+            leave_date: l.leave_date ? String(l.leave_date).slice(0, 10) : '',
+            due_date: l.due_date ? String(l.due_date).slice(0, 10) : '',
             start_time: l.start_time ? l.start_time.slice(0, 5) : '',
             due_time: l.due_time ? l.due_time.slice(0, 5) : '',
             nature: l.nature || 'casual',
             days: l.days || '1',
+            half_day: HALF_DAY_NATURES.includes(l.nature) && Number(l.days) === 0.5,
             reason: l.reason || '',
         })
         setEdit(l)
         setShow(true)
     }
 
-    const canManageRequest = (l) =>
-        !['approved', 'rejected'].includes(l.status || 'pending_hod') &&
-        (user?.id == l.employee_id || ['admin', 'super_admin', 'principal'].includes(user?.role))
+    const canManageRequest = (l) => {
+        const s = l.status || 'pending_hod'
+        if (['approved', 'rejected'].includes(s)) return false
+        if (['admin', 'super_admin', 'principal'].includes(user?.role)) return true
+        if (user?.id != l.employee_id) return false
+        return user?.role === 'staff' ? s === 'pending_hod' : true
+    }
 
     const submit = handleSubmit((formData) => {
         if (noBalance) return
@@ -226,7 +231,7 @@ export default function Index({ leaves, employees, leaveBalance }) {
                                 { value: 'pending_principal', label: 'Pending Principal' },
                                 { value: 'approved', label: 'Approved' },
                                 { value: 'rejected', label: 'Rejected' },
-                            ]} placeholder="All Status" /></Col>
+                            ].filter(o => !(user?.role === 'principal' && o.value === 'pending_hod'))} placeholder="All Status" /></Col>
                         {!isStaff && <Col md={3}><Select2 value={filter.employee_id} onChange={v => setFilter(f => ({ ...f, employee_id: v }))}
                             options={employees?.map(e => ({ value: e.id, label: e.name }))} placeholder="All Employees" /></Col>}
                     </Row>
